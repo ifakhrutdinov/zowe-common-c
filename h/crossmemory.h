@@ -256,8 +256,9 @@ typedef struct CMSModifyCommand_tag {
 } CMSModifyCommand;
 
 typedef enum CMSModifyCommandStatus_tag {
-  CMS_MODIFY_COMMAND_STATUS_NA         = 1,
-  CMS_MODIFY_COMMAND_STATUS_PROCESSED  = 2,
+  CMS_MODIFY_COMMAND_STATUS_UNKNOWN = 1,
+  CMS_MODIFY_COMMAND_STATUS_PROCESSED = 2,
+  CMS_MODIFY_COMMAND_STATUS_CONSUMED = 3,
 } CMSModifyCommandStatus;
 
 typedef int (CMSStarCallback)(CrossMemoryServerGlobalArea *globalArea,

@@ -2763,7 +2763,7 @@ static CMSModifyCommandStatus passCommandToUserCallback(
     CMSWTORouteInfo *routeInfo
 ) {
 
-  CMSModifyCommandStatus status = CMS_MODIFY_COMMAND_STATUS_NA;
+  CMSModifyCommandStatus status = CMS_MODIFY_COMMAND_STATUS_UNKNOWN;
 
   CMSModifyCommandCallback *userCallback = server->commandCallback;
 
@@ -2781,6 +2781,27 @@ static CMSModifyCommandStatus passCommandToUserCallback(
   userCallback(server->globalArea, &command, &status, server->callbackData);
 
   return status;
+}
+
+static CMSModifyCommandStatus passCommandToCMSCommandHandlers(
+    CrossMemoryServer *server,
+    char *commandVerb,
+    char **args, unsigned int argCount,
+    CMSWTORouteInfo *routeInfo
+) {
+
+  if (strcmp(commandVerb, CMS_COMMAND_VERB_LOG) == 0) {
+    handleCommandVerbLog(server, args, argCount, routeInfo);
+  } else if (strcmp(commandVerb, CMS_COMMAND_VERB_FLUSH) == 0) {
+    handleCommandVerbFlush(server, args, argCount, routeInfo);
+  } else if (strcmp(commandVerb, CMS_COMMAND_VERB_DISPLAY) == 0 ||
+             strcmp(commandVerb, CMS_COMMAND_VERB_DISPLAY_ABBRV) == 0) {
+    handleCommandVerbDisplay(server, args, argCount, routeInfo);
+  } else {
+    return CMS_MODIFY_COMMAND_STATUS_UNKNOWN;
+  }
+
+  return CMS_MODIFY_COMMAND_STATUS_PROCESSED;
 }
 
 static int handleModifyCommand(STCBase *base, CIB *cib, STCConsoleCommandType commandType, const char *command, unsigned short commandLength, void *userData) {
@@ -2826,18 +2847,19 @@ static int handleModifyCommand(STCBase *base, CIB *cib, STCConsoleCommandType co
         char **args = commandTokens + 1;
         unsigned int argCount = commandTokenCount - 1;
 
-        CMSModifyCommandStatus cmsCommandStatus =
-            passCommandToUserCallback(server, commandVerb, args, argCount,
-                                      &routeInfo);
+        CMSModifyCommandStatus status = CMS_MODIFY_COMMAND_STATUS_UNKNOWN;
 
-        if (strcmp(commandVerb, CMS_COMMAND_VERB_LOG) == 0) {
-          handleCommandVerbLog(server, args, argCount, &routeInfo);
-        } else if (strcmp(commandVerb, CMS_COMMAND_VERB_FLUSH) == 0) {
-          handleCommandVerbFlush(server, args, argCount, &routeInfo);
-        } else if (strcmp(commandVerb, CMS_COMMAND_VERB_DISPLAY) == 0 ||
-                   strcmp(commandVerb, CMS_COMMAND_VERB_DISPLAY_ABBRV) == 0) {
-          handleCommandVerbDisplay(server, args, argCount, &routeInfo);
-        } else if (cmsCommandStatus != CMS_MODIFY_COMMAND_STATUS_PROCESSED) {
+        status = passCommandToUserCallback(server, commandVerb,
+                                           args, argCount,
+                                           &routeInfo);
+
+        if (status != CMS_MODIFY_COMMAND_STATUS_CONSUMED) {
+          status = passCommandToCMSCommandHandlers(server, commandVerb,
+                                                   args, argCount,
+                                                   &routeInfo);
+        }
+
+        if (status == CMS_MODIFY_COMMAND_STATUS_UNKNOWN) {
           zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_WARNING, CMS_LOG_BAD_CMD_MSG, commandVerb);
           wtoPrintf2(consoleID, cart, CMS_LOG_BAD_CMD_MSG, commandVerb);
         }
