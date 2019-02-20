@@ -1821,7 +1821,8 @@ CrossMemoryServer *makeCrossMemoryServer(STCBase *base,
                                          const CrossMemoryServerName *name,
                                          unsigned int flags, int *reasonCode) {
 
-  return makeCrossMemoryServer2(base, name, flags, NULL, NULL, NULL, reasonCode);
+  return makeCrossMemoryServer2(base, name, flags, NULL, NULL, NULL, NULL,
+                                reasonCode);
 
 }
 
@@ -1831,6 +1832,7 @@ CrossMemoryServer *makeCrossMemoryServer2(
     unsigned int flags,
     CMSStarCallback *startCallback,
     CMSStopCallback *stopCallback,
+    CMSModifyCommandCallback *commandCallback,
     void *callbackData,
     int *reasonCode
 ) {
@@ -1853,6 +1855,7 @@ CrossMemoryServer *makeCrossMemoryServer2(
 
   server->startCallback = startCallback;
   server->stopCallback = stopCallback;
+  server->commandCallback = commandCallback;
   server->callbackData = callbackData;
 
   if (flags & CMS_SERVER_FLAG_DEBUG) {
@@ -2753,6 +2756,33 @@ static char **tokenizeModifyCommand(ShortLivedHeap *slh, const char *command, un
   return tokens;
 }
 
+static CMSModifyCommandStatus passCommandToUserCallback(
+    CrossMemoryServer *server,
+    char *verb,
+    char **args, unsigned int argCount,
+    CMSWTORouteInfo *routeInfo
+) {
+
+  CMSModifyCommandStatus status = CMS_MODIFY_COMMAND_STATUS_NA;
+
+  CMSModifyCommandCallback *userCallback = server->commandCallback;
+
+  if (userCallback == NULL) {
+    return status;
+  }
+
+  const CMSModifyCommand command = {
+      .routeInfo = routeInfo,
+      .commandVerb = verb,
+      .args = (const char* const*)args,
+      .argCount = argCount,
+  };
+
+  userCallback(server->globalArea, &command, &status, server->callbackData);
+
+  return status;
+}
+
 static int handleModifyCommand(STCBase *base, CIB *cib, STCConsoleCommandType commandType, const char *command, unsigned short commandLength, void *userData) {
 
   CrossMemoryServer *server = userData;
@@ -2796,6 +2826,10 @@ static int handleModifyCommand(STCBase *base, CIB *cib, STCConsoleCommandType co
         char **args = commandTokens + 1;
         unsigned int argCount = commandTokenCount - 1;
 
+        CMSModifyCommandStatus cmsCommandStatus =
+            passCommandToUserCallback(server, commandVerb, args, argCount,
+                                      &routeInfo);
+
         if (strcmp(commandVerb, CMS_COMMAND_VERB_LOG) == 0) {
           handleCommandVerbLog(server, args, argCount, &routeInfo);
         } else if (strcmp(commandVerb, CMS_COMMAND_VERB_FLUSH) == 0) {
@@ -2803,7 +2837,7 @@ static int handleModifyCommand(STCBase *base, CIB *cib, STCConsoleCommandType co
         } else if (strcmp(commandVerb, CMS_COMMAND_VERB_DISPLAY) == 0 ||
                    strcmp(commandVerb, CMS_COMMAND_VERB_DISPLAY_ABBRV) == 0) {
           handleCommandVerbDisplay(server, args, argCount, &routeInfo);
-        } else {
+        } else if (cmsCommandStatus != CMS_MODIFY_COMMAND_STATUS_PROCESSED) {
           zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_WARNING, CMS_LOG_BAD_CMD_MSG, commandVerb);
           wtoPrintf2(consoleID, cart, CMS_LOG_BAD_CMD_MSG, commandVerb);
         }

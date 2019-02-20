@@ -54,6 +54,7 @@
 #define CROSS_MEMORY_SERVER_SUBPOOL 228
 
 #define RC_CMS_OK                           0
+#define RC_CMS_COMMAND_NOT_HADNLED          2
 #define RC_CMS_ERROR                        8
 #define RC_CMS_PARM_NULL                    9
 #define RC_CMS_PARM_BAD_EYECATCHER          10
@@ -247,11 +248,26 @@ typedef struct CMSWTORouteInfo_tag {
   char padding[4];
 } CMSWTORouteInfo;
 
+typedef struct CMSModifyCommand_tag {
+  const CMSWTORouteInfo *routeInfo;
+  const char *commandVerb;
+  const char* const* args;
+  unsigned int argCount;
+} CMSModifyCommand;
+
+typedef enum CMSModifyCommandStatus_tag {
+  CMS_MODIFY_COMMAND_STATUS_NA         = 1,
+  CMS_MODIFY_COMMAND_STATUS_PROCESSED  = 2,
+} CMSModifyCommandStatus;
 
 typedef int (CMSStarCallback)(CrossMemoryServerGlobalArea *globalArea,
                               void *userData);
 typedef int (CMSStopCallback)(CrossMemoryServerGlobalArea *globalArea,
                               void *userData);
+typedef int (CMSModifyCommandCallback)(CrossMemoryServerGlobalArea *globalArea,
+                                       const CMSModifyCommand *command,
+                                       CMSModifyCommandStatus *status,
+                                       void *userData);
 
 typedef struct CrossMemoryServer_tag {
   char eyecatcher[8];
@@ -264,6 +280,7 @@ typedef struct CrossMemoryServer_tag {
   STCBase * __ptr32 base;
   CMSStarCallback * __ptr32 startCallback;
   CMSStopCallback * __ptr32 stopCallback;
+  CMSModifyCommandCallback * __ptr32 commandCallback;
   PAD_LONG(0, void *callbackData);
   CrossMemoryServerGlobalArea * __ptr32 globalArea;
   CMSWTORouteInfo startCommandInfo;
@@ -358,6 +375,7 @@ CrossMemoryServer *makeCrossMemoryServer2(
     unsigned int flags,
     CMSStarCallback *startCallback,
     CMSStopCallback *stopCallback,
+    CMSModifyCommandCallback *commandCallback,
     void *callbackData,
     int *reasonCode
 );
