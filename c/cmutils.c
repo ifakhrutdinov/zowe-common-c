@@ -617,10 +617,14 @@ CrossMemoryMap *makeCrossMemoryMap(unsigned int keySize) {
 }
 
 /* This function is not thread-safe. */
-void removeCrossMemoryMap(CrossMemoryMap *map) {
-  cellpoolDelete(map->entryCellpool);
+void removeCrossMemoryMap(CrossMemoryMap **mapAddr) {
+  CrossMemoryMap *map = *mapAddr;
+  CPID cellpoolToDelete = map->entryCellpool;
   map->entryCellpool = -1;
-  cmFree(map, map->size, CM_MAP_SUBPOOL, CM_MAP_KEY);
+  if (cellpoolToDelete != -1) {
+    cellpoolDelete(cellpoolToDelete);
+  }
+  cmFree2((void **)mapAddr, map->size, CM_MAP_SUBPOOL, CM_MAP_KEY);
 }
 
 static unsigned int calculateKeyHash(const void *key, unsigned int size) {

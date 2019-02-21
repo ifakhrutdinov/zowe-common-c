@@ -66,7 +66,7 @@ void cmFree2(void **dataPtr, unsigned int size, int subpool, int key);
 typedef struct CrossMemoryMap_tag CrossMemoryMap;
 
 CrossMemoryMap *makeCrossMemoryMap(unsigned int keySize);
-void removeCrossMemoryMap(CrossMemoryMap *map);
+void removeCrossMemoryMap(CrossMemoryMap **mapAddr);
 int crossMemoryMapPut(CrossMemoryMap *map, const void *key, void *value);
 void **crossMemoryMapGetHandle(CrossMemoryMap *map, const void *key);
 void *crossMemoryMapGet(CrossMemoryMap *map, const void *key);
