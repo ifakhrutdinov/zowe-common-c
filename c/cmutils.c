@@ -576,7 +576,7 @@ ZOWE_PRAGMA_PACK_RESET
 #define CM_MAP_PRIMARY_CELL_COUNT     16
 #define CM_MAP_SECONDARY_CELL_COUNT   32
 
-#define CM_MAP_HEADER "CMUTILS ESCA MAP        "
+#define CM_MAP_HEADER "CMUTILS ECSA MAP        "
 
 CrossMemoryMap *makeCrossMemoryMap(unsigned int keySize) {
 
