@@ -674,7 +674,7 @@ static void removeEntry(CrossMemoryMap *map, CrossMemoryMapEntry *entry) {
 
 /* Put a new key-value into the map:
  *  0 - success
- *  1 - entry already exists
+ *  1 - entry already exists (the value is not updated)
  * -1 - fatal error
  *
  * This function is thread-safe.
@@ -695,10 +695,13 @@ int crossMemoryMapPut(CrossMemoryMap *map, const void *key, void *value) {
       return -1; /* fatal error */
     }
     newEntry->next = chain;
+  } else {
+    return 1;
   }
 
-  /* we don't allow entry removal, so it should be safe to assume that when
-   * a new entry is added to a chain, the chain head address always changes */
+  /* We don't allow entry removal, so it should be safe to assume that when
+   * a new entry is added to a chain, the chain head address always changes,
+   * that is, there should not be the ABA problem. */
   while (cs((cs_t *)&chain, (cs_t *)&map->buckets[bucketID], (cs_t)newEntry)) {
     /* chain has been updated */
     if (findEntry(chain, key, keySize)) {
