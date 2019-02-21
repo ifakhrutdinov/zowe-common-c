@@ -89,8 +89,6 @@ static void eightCharStringInit(EightCharString *string, char *cstring, char pad
   memcpy(string->text, cstring, copyLength);
 }
 
-ZOWE_PRAGMA_PACK
-
 /* This is the QNAME used for all product enqueues. It must NEVER change. */
 static const QName PRODUCT_QNAME   = {CMS_PROD_ID"    "};
 /* These QNAME and RNAME must NEVER change and be the same across all
