@@ -769,6 +769,12 @@ CrossMemoryServerName cmsMakeServerName(const char *nameNullTerm);
 #define CMS_LOG_BUILD_TIME_MISMATCH_MSG_TEXT    "Discarding outdated LPA module at %p (%26.26s - %26.26s)"
 #define CMS_LOG_BUILD_TIME_MISMATCH_MSG          CMS_LOG_BUILD_TIME_MISMATCH_MSG_ID" "CMS_LOG_BUILD_TIME_MISMATCH_MSG_TEXT
 
+#ifndef CMS_LOG_BAD_SERVICE_ADDR_ID_MSG_ID
+#define CMS_LOG_BAD_SERVICE_ADDR_ID_MSG_ID      CMS_MSG_PRFX"0241E"
+#endif
+#define CMS_LOG_BAD_SERVICE_ADDR_ID_MSG_TEXT    "Service with ID %d not relocated, 0x%p not in range [0x%p, 0x%p]"
+#define CMS_LOG_BAD_SERVICE_ADDR_ID_MSG         CMS_LOG_BAD_SERVICE_ADDR_ID_MSG_ID" "CMS_LOG_BAD_SERVICE_ADDR_ID_MSG_TEXT
+
 #endif /* H_CROSSMEMORY_H_ */
 
 

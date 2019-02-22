@@ -1907,10 +1907,13 @@ int cmsRegisterService(CrossMemoryServer *server, int id, CrossMemoryServiceFunc
   bool relocationRequired = (isSpaceSwitch && relocateToCommon && !codeInCommon) || (isCurrentPrimary && !codeInCommon);
 
   if (relocationRequired) {
-    char *moduleAddressLocal = server->moduleAddressLocal;
-    char *moduleAddressLPA = server->moduleAddressLPA;
+    char *moduleAddressLocalStart = server->moduleAddressLocal;
+    char *moduleAddressLocalEnd = moduleAddressLocalStart + server->moduleSize;
     char *serviceFunctionLocal = (char *)serviceFunction;
-    if (serviceFunctionLocal < moduleAddressLocal || moduleAddressLocal + server->moduleSize < serviceFunctionLocal) {
+    if (serviceFunctionLocal < moduleAddressLocalStart || moduleAddressLocalEnd < serviceFunctionLocal) {
+      zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_SEVERE,
+              CMS_LOG_BAD_SERVICE_ADDR_ID_MSG, id, serviceFunction,
+              moduleAddressLocalStart, moduleAddressLocalEnd);
       return RC_CMS_SERVICE_NOT_RELOCATABLE;
     }
   }
