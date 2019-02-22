@@ -342,7 +342,6 @@ ZOWE_PRAGMA_PACK_RESET
 #define cmsRegisterService CMCMSRSR
 #define cmsStartMainLoop CMCMAINL
 #define cmsGetGlobalArea CMGETGA
-#define cmGetCallerTaskACEE CMGTACEE
 #define cmsAddConfigParm CMADDPRM
 #define cmsCallService CMCMSRCS
 #define cmsCallService2 CMCALLS2
@@ -383,7 +382,6 @@ void removeCrossMemoryServer(CrossMemoryServer *server);
 int cmsRegisterService(CrossMemoryServer *server, int id, CrossMemoryServiceFunction *serviceFunction, void *serviceData, int flags);
 int cmsStartMainLoop(CrossMemoryServer *server);
 int cmsGetGlobalArea(const CrossMemoryServerName *serverName, CrossMemoryServerGlobalArea **globalAreaAddress);
-void cmGetCallerTaskACEE(ACEE *content, ACEE **address);
 int cmsAddConfigParm(CrossMemoryServer *server,
                      const char *name, const void *value,
                      CrossMemoryServerParmType type);

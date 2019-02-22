@@ -20,6 +20,7 @@
 #include <stddef.h>
 #endif
 
+#include "zos.h"
 #include "zowetypes.h"
 
 #define CROSS_MEMORY_ALET_PASN  0
@@ -35,6 +36,10 @@
 #define cmCopyToHomeWithCallerKey CMCPTHSK
 #define cmCopyFromHomeWithCallerKey CMCPFHSK
 #define cmCopyWithSourceKeyAndALET CMCPYSKA
+
+#define cmGetCallerAddressSpaceACEE CMGAACEE
+#define cmGetCallerTaskACEE CMGTACEE
+
 #define cmAlloc CMALLOC
 #define cmFree CMFREE
 #define cmAlloc2 CMALLOC2
@@ -57,6 +62,9 @@ void cmCopyToHomeWithCallerKey(void *dest, const void *src, size_t size);
 void cmCopyFromHomeWithCallerKey(void *dest, const void *src, size_t size);
 void cmCopyWithSourceKeyAndALET(void *dest, const void *src, unsigned int key,
                                 unsigned int alet, size_t size);
+
+void cmGetCallerAddressSpaceACEE(ACEE *content, ACEE **address);
+void cmGetCallerTaskACEE(ACEE *content, ACEE **address);
 
 void *cmAlloc(unsigned int size, int subpool, int key);
 void cmFree(void *data, unsigned int size, int subpool, int key);
