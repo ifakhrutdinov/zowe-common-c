@@ -3673,7 +3673,7 @@ int cmsCallService(const CrossMemoryServerName *serverName, int serviceID, void 
 int cmsCallService2(CrossMemoryServerGlobalArea *cmsGlobalArea,
                     int serviceID, void *parmList, int *serviceRC) {
 
-  if (CROSS_MEMORY_SERVER_MAX_SERVICE_ID < serviceID) {
+  if (serviceID <= 0 || CROSS_MEMORY_SERVER_MAX_SERVICE_ID < serviceID) {
     return RC_CMS_FUNCTION_ID_OUT_OF_RANGE;
   }
 
