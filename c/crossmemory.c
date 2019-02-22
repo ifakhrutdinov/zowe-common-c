@@ -3445,10 +3445,13 @@ int cmsStartMainLoop(CrossMemoryServer *srv) {
     if (srv->startCallback != NULL) {
       int callbackRC = srv->startCallback(srv->globalArea, srv->callbackData);
       if (callbackRC != 0) {
-        zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_SEVERE, CMS_LOG_TMP_DEV_MSG
-               "Start callback failed, RC = %d", callbackRC);
+        zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_SEVERE,
+                CMS_LOG_INIT_STEP_FAILURE_MSG, "start callback", callbackRC);
         status = RC_CMS_ERROR;
         startCallbackSuccess = false;
+      } else {
+        zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_INFO,
+                CMS_LOG_INIT_STEP_SUCCESS_MSG, "start callback");
       }
     }
   }
@@ -3513,9 +3516,12 @@ int cmsStartMainLoop(CrossMemoryServer *srv) {
     if (srv->stopCallback != NULL) {
       int callbackRC = srv->stopCallback(srv->globalArea, srv->callbackData);
       if (callbackRC != 0) {
-        zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_SEVERE, CMS_LOG_TMP_DEV_MSG
-               "Stop callback failed, RC = %d", callbackRC);
+        zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_SEVERE,
+                CMS_LOG_TERM_STEP_FAILURE_MSG, "stop callback", callbackRC);
         status = RC_CMS_ERROR;
+      } else {
+        zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_INFO,
+                CMS_LOG_TERM_STEP_SUCCESS_MSG, "stop callback");
       }
     }
   }

@@ -769,12 +769,6 @@ CrossMemoryServerName cmsMakeServerName(const char *nameNullTerm);
 #define CMS_LOG_BUILD_TIME_MISMATCH_MSG_TEXT    "Discarding outdated LPA module at %p (%26.26s - %26.26s)"
 #define CMS_LOG_BUILD_TIME_MISMATCH_MSG          CMS_LOG_BUILD_TIME_MISMATCH_MSG_ID" "CMS_LOG_BUILD_TIME_MISMATCH_MSG_TEXT
 
-#ifndef CMS_LOG_TMP_DEV_MSG_ID
-#define CMS_LOG_TMP_DEV_MSG_ID                  CMS_MSG_PRFX"999X"
-#endif
-#define CMS_LOG_TMP_DEV_MSG_TEXT                ""
-#define CMS_LOG_TMP_DEV_MSG                     CMS_LOG_TMP_DEV_MSG_ID" "CMS_LOG_TMP_DEV_MSG_TEXT
-
 #endif /* H_CROSSMEMORY_H_ */
 
 
