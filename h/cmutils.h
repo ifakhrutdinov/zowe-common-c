@@ -71,14 +71,8 @@ int crossMemoryMapPut(CrossMemoryMap *map, const void *key, void *value);
 void **crossMemoryMapGetHandle(CrossMemoryMap *map, const void *key);
 void *crossMemoryMapGet(CrossMemoryMap *map, const void *key);
 
-typedef void (CrossMemoryMapVisitor)(const char *key, unsigned int keySize,
-                                     void **valueHandle, void *visitorData);
-void crossMemoryMapIterate(CrossMemoryMap *map,
-                           CrossMemoryMapVisitor *visitor,
-                           void *visitorData);
-
-typedef void (CrossMemoryMapVisitor)(const char *key, unsigned int keySize,
-                                     void **valueHandle, void *visitorData);
+typedef int (CrossMemoryMapVisitor)(const char *key, unsigned int keySize,
+                                    void **valueHandle, void *visitorData);
 void crossMemoryMapIterate(CrossMemoryMap *map,
                            CrossMemoryMapVisitor *visitor,
                            void *visitorData);

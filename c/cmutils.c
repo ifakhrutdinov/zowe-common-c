@@ -750,7 +750,9 @@ void crossMemoryMapIterate(CrossMemoryMap *map,
   for (unsigned int bucketID = 0; bucketID < map->bucketCount; bucketID++) {
     CrossMemoryMapEntry *entry = map->buckets[bucketID];
     while (entry != NULL) {
-      visitor(entry->key, map->keySize, &entry->value, visitorData);
+      if (visitor(entry->key, map->keySize, &entry->value, visitorData) != 0) {
+        return;
+      }
       entry = entry->next;
     }
   }
