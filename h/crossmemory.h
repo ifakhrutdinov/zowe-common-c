@@ -54,7 +54,6 @@
 #define CROSS_MEMORY_SERVER_SUBPOOL 228
 
 #define RC_CMS_OK                           0
-#define RC_CMS_COMMAND_NOT_HADNLED          2
 #define RC_CMS_ERROR                        8
 #define RC_CMS_PARM_NULL                    9
 #define RC_CMS_PARM_BAD_EYECATCHER          10
