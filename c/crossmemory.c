@@ -2477,7 +2477,12 @@ static void flushDebugMessages(CrossMemoryServer *server) {
 
 }
 
-static void handleCommandVerbFlush(CrossMemoryServer *server, char **args, unsigned int argCount, CMSWTORouteInfo *routeInfo) {
+static CMSModifyCommandStatus handleCommandVerbFlush(
+    CrossMemoryServer *server,
+    char **args,
+    unsigned int argCount,
+    CMSWTORouteInfo *routeInfo
+) {
 
   CART cart = routeInfo->cart;
   int consoleID = routeInfo->consoleID;
@@ -2486,20 +2491,18 @@ static void handleCommandVerbFlush(CrossMemoryServer *server, char **args, unsig
   if (argCount != expectedArgCount) {
     zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_WARNING, CMS_LOG_INVALID_CMD_ARGS_MSG, "FLUSH", expectedArgCount, argCount);
     wtoPrintf2(consoleID, cart, CMS_LOG_INVALID_CMD_ARGS_MSG, "FLUSH", expectedArgCount, argCount);
-    return;
+    return CMS_MODIFY_COMMAND_STATUS_REJECTED;
   }
-
-  zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_INFO, CMS_LOG_CMD_RECEIVED_MSG, "FLUSH", "-", "-", "-");
 
   if ((server->flags & CROSS_MEMORY_SERVER_FLAG_READY) == 0) {
     zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_WARNING, CMS_LOG_NOT_READY_FOR_CMD_MSG, "FLUSH");
     wtoPrintf2(consoleID, cart, CMS_LOG_NOT_READY_FOR_CMD_MSG, "FLUSH");
-    return;
+    return CMS_MODIFY_COMMAND_STATUS_REJECTED;
   }
 
   flushDebugMessages(server);
 
-  wtoPrintf2(consoleID, cart, CMS_LOG_CMD_ACCEPTED_MSG, "FLUSH");
+  return CMS_MODIFY_COMMAND_STATUS_CONSUMED;
 }
 
 static void printDisplayConfigCommandResponse(CrossMemoryServer *server, CMSWTORouteInfo *routeInfo) {
@@ -2581,7 +2584,12 @@ static void printDisplayConfigCommandResponse(CrossMemoryServer *server, CMSWTOR
 
 #define CMS_COMMAND_VERB_DISAPLY_DEFAULT_OPTION "CONFIG"
 
-static void handleCommandVerbDisplay(CrossMemoryServer *server, char **args, unsigned int argCount, CMSWTORouteInfo *routeInfo) {
+static CMSModifyCommandStatus handleCommandVerbDisplay(
+    CrossMemoryServer *server,
+    char **args,
+    unsigned int argCount,
+    CMSWTORouteInfo *routeInfo
+) {
 
   CART cart = routeInfo->cart;
   int consoleID = routeInfo->consoleID;
@@ -2598,15 +2606,13 @@ static void handleCommandVerbDisplay(CrossMemoryServer *server, char **args, uns
   if (argCount != expectedArgCount) {
     zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_WARNING, CMS_LOG_INVALID_CMD_ARGS_MSG, "DISPLAY", expectedArgCount, argCount);
     wtoPrintf2(consoleID, cart, CMS_LOG_INVALID_CMD_ARGS_MSG, "DISPLAY", expectedArgCount, argCount);
-    return;
+    return CMS_MODIFY_COMMAND_STATUS_REJECTED;
   }
-
-  zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_INFO, CMS_LOG_CMD_RECEIVED_MSG, "DISPLAY", option, "-", "-");
 
   if ((server->flags & CROSS_MEMORY_SERVER_FLAG_READY) == 0) {
     zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_WARNING, CMS_LOG_NOT_READY_FOR_CMD_MSG, "DISPLAY");
     wtoPrintf2(consoleID, cart, CMS_LOG_NOT_READY_FOR_CMD_MSG, "DISPLAY");
-    return;
+    return CMS_MODIFY_COMMAND_STATUS_REJECTED;
   }
 
   if (strcmp(option, "CONFIG") == 0) {
@@ -2614,30 +2620,36 @@ static void handleCommandVerbDisplay(CrossMemoryServer *server, char **args, uns
   } else {
     zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_WARNING, CMS_LOG_BAD_DISPLAY_OPTION_MSG, option);
     wtoPrintf2(consoleID, cart, CMS_LOG_BAD_DISPLAY_OPTION_MSG, option);
-    return;
+    return CMS_MODIFY_COMMAND_STATUS_REJECTED;
   }
 
-  wtoPrintf2(consoleID, cart, CMS_LOG_CMD_ACCEPTED_MSG, "DISPLAY");
+  return CMS_MODIFY_COMMAND_STATUS_CONSUMED;
 }
 
-static void handleCommandVerbLog(CrossMemoryServer *server, char **args, unsigned int argCount, CMSWTORouteInfo *routeInfo) {
+static CMSModifyCommandStatus handleCommandVerbLog(
+    CrossMemoryServer *server,
+    char **args,
+    unsigned int argCount,
+    CMSWTORouteInfo *routeInfo
+) {
 
   CART cart = routeInfo->cart;
   int consoleID = routeInfo->consoleID;
 
   unsigned int expectedArgCount = 2;
   if (argCount != expectedArgCount) {
-    zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_WARNING, CMS_LOG_INVALID_CMD_ARGS_MSG, "LOG", expectedArgCount, argCount);
-    wtoPrintf2(consoleID, cart, CMS_LOG_INVALID_CMD_ARGS_MSG, "LOG", expectedArgCount, argCount);
-    return;
+    zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_WARNING,
+            CMS_LOG_INVALID_CMD_ARGS_MSG, "LOG", expectedArgCount, argCount);
+    wtoPrintf2(consoleID, cart, CMS_LOG_INVALID_CMD_ARGS_MSG, "LOG",
+               expectedArgCount, argCount);
+    return CMS_MODIFY_COMMAND_STATUS_REJECTED;
   }
 
-  zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_INFO, CMS_LOG_CMD_RECEIVED_MSG, "LOG", args[0], args[1], "-");
-
   if ((server->flags & CROSS_MEMORY_SERVER_FLAG_READY) == 0) {
-    zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_WARNING, CMS_LOG_NOT_READY_FOR_CMD_MSG, "LOG");
+    zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_WARNING,
+            CMS_LOG_NOT_READY_FOR_CMD_MSG, "LOG");
     wtoPrintf2(consoleID, cart, CMS_LOG_NOT_READY_FOR_CMD_MSG, "LOG");
-    return;
+    return CMS_MODIFY_COMMAND_STATUS_REJECTED;
   }
 
   char *component = args[0];
@@ -2649,9 +2661,10 @@ static void handleCommandVerbLog(CrossMemoryServer *server, char **args, unsigne
   } else if (strcmp(component, "CMSPC") == 0) {
     logCompID = LOG_COMP_ID_CMSPC;
   } else {
-    zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_WARNING, CMS_LOG_BAD_LOG_COMP_MSG, component);
+    zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_WARNING, CMS_LOG_BAD_LOG_COMP_MSG,
+            component);
     wtoPrintf2(consoleID, cart, CMS_LOG_BAD_LOG_COMP_MSG, component);
-    return;
+    return CMS_MODIFY_COMMAND_STATUS_REJECTED;
   }
 
   char *level = args[1];
@@ -2669,9 +2682,10 @@ static void handleCommandVerbLog(CrossMemoryServer *server, char **args, unsigne
   } else if (strcmp(level, "DEBUG3") == 0) {
     logLevel = ZOWE_LOG_DEBUG3;
   } else {
-    zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_WARNING, CMS_LOG_BAD_LOG_LEVEL_MSG, level);
+    zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_WARNING, CMS_LOG_BAD_LOG_LEVEL_MSG,
+            level);
     wtoPrintf2(consoleID, cart, CMS_LOG_BAD_LOG_LEVEL_MSG, level);
-    return;
+    return CMS_MODIFY_COMMAND_STATUS_REJECTED;
   }
 
   logSetLevel(NULL, logCompID, logLevel);
@@ -2679,7 +2693,7 @@ static void handleCommandVerbLog(CrossMemoryServer *server, char **args, unsigne
     server->globalArea->pcLogLevel = logLevel;
   }
 
-  wtoPrintf2(consoleID, cart, CMS_LOG_CMD_ACCEPTED_MSG, "LOG");
+  return CMS_MODIFY_COMMAND_STATUS_CONSUMED;
 }
 
 static int workElementHandler(STCBase *base, STCModule *module, WorkElementPrefix *prefix) {
@@ -2700,6 +2714,7 @@ int backgroundHandler(STCBase *base, STCModule *module, int selectStatus) {
 #define CMS_COMMAND_VERB_LOG            "LOG"
 #define CMS_COMMAND_VERB_FLUSH          "FLUSH"
 #define CMS_COMMAND_VERB_DISPLAY        "DISPLAY"
+#define CMS_COMMAND_VERB_DISPLAY_SHORT  "DIS"
 #define CMS_COMMAND_VERB_DISPLAY_ABBRV  "D"
 #define CMS_COMMAND_VERB_COLD           "COLD"
 
@@ -2757,52 +2772,389 @@ static char **tokenizeModifyCommand(ShortLivedHeap *slh, const char *command, un
   return tokens;
 }
 
-static CMSModifyCommandStatus passCommandToUserCallback(
+typedef struct CommandTaskContext_tag {
+  char eyecatcher[8];
+#define COMMAND_TASK_CONTEXT_EYECATCHER "CMSCTEYE"
+  CrossMemoryServer *server;
+  CMSWTORouteInfo routeInfo;
+  char *command;
+  unsigned short commandLength;
+} CommandTaskContext;
+
+static CommandTaskContext *makeCommandTaskContext(
     CrossMemoryServer *server,
-    char *verb,
+    const char *command,
+    unsigned short commandLength,
+    const CMSWTORouteInfo *routeInfo
+) {
+
+  CommandTaskContext *context =
+      (CommandTaskContext *)safeMalloc(sizeof(CommandTaskContext),
+                                       "CommandTaskContext");
+  if (context == NULL) {
+    return NULL;
+  }
+  memset(context, 0, sizeof(CommandTaskContext));
+  memcpy(context->eyecatcher, COMMAND_TASK_CONTEXT_EYECATCHER,
+         sizeof(context->eyecatcher));
+  context->server = server;
+  context->routeInfo = *routeInfo;
+
+  context->command = safeMalloc(commandLength, "async modify command");
+  if (context->command != NULL) {
+    memcpy(context->command, command, commandLength);
+    context->commandLength = commandLength;
+  } else {
+    safeFree((char *)context, sizeof(CommandTaskContext));
+    context = NULL;
+  }
+
+  return context;
+}
+
+static void destroyCommandTaskContext(CommandTaskContext *context) {
+  safeFree(context->command, context->commandLength);
+  context->command = NULL;
+  safeFree((char *)context, sizeof(CommandTaskContext));
+  context = NULL;
+}
+
+static void reportCommandRetrieval(char *commandVerb,
+                                   char *target,
+                                   char **args,
+                                   unsigned int argCount,
+                                   CMSWTORouteInfo *routeInfo) {
+
+  unsigned int consoleID = routeInfo->consoleID;
+  CART cart = routeInfo->cart;
+
+  char *message;
+  if (target != NULL) {
+    message = CMS_LOG_CMD_RECEIVED_MSG" (target = %s)";
+  } else {
+    message = CMS_LOG_CMD_RECEIVED_MSG"%s";
+    target = "";
+  }
+
+  zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_INFO, message, commandVerb, target);
+  wtoPrintf2(consoleID, cart, message, commandVerb, target);
+
+}
+
+static void reportCommandStatus(char *commandVerb,
+                                char *target,
+                                char **args,
+                                unsigned int argCount,
+                                CMSWTORouteInfo *routeInfo,
+                                CMSModifyCommandStatus status) {
+
+  unsigned int consoleID = routeInfo->consoleID;
+  CART cart = routeInfo->cart;
+
+  char *badCmdMsg;
+  char *rejectMsg;
+  if (target != NULL) {
+    badCmdMsg = CMS_LOG_BAD_CMD_MSG" (target = %s)";
+    rejectMsg = CMS_LOG_CMD_REJECTED_MSG" (target = %s)";
+  } else {
+    badCmdMsg = CMS_LOG_BAD_CMD_MSG"%s";
+    rejectMsg = CMS_LOG_CMD_REJECTED_MSG"%s";
+    target = "";
+  }
+
+  if (status == CMS_MODIFY_COMMAND_STATUS_UNKNOWN) {
+    zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_WARNING, badCmdMsg, commandVerb,
+            target);
+    wtoPrintf2(consoleID, cart, badCmdMsg, commandVerb, target);
+  } else if (status != CMS_MODIFY_COMMAND_STATUS_CONSUMED &&
+             status != CMS_MODIFY_COMMAND_STATUS_PROCESSED) {
+    zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_INFO, rejectMsg, commandVerb, target);
+    wtoPrintf2(consoleID, cart, rejectMsg, commandVerb, target);
+  }
+
+}
+
+typedef struct ABENDInfo_tag {
+  char eyecatcher[8];
+#define ABEND_INFO_EYECATCHER "CMSABEDI"
+  int completionCode;
+  int reasonCode;
+} ABENDInfo;
+
+static void extractABENDInfo(RecoveryContext * __ptr32 context,
+                             SDWA * __ptr32 sdwa,
+                             void * __ptr32 userData) {
+  ABENDInfo *info = (ABENDInfo *)userData;
+  recoveryGetABENDCode(sdwa, &info->completionCode, &info->reasonCode);
+}
+
+static void passCommandToUserCallback(
+    CrossMemoryServer *server,
+    char *commandVerb,
+    char *target,
     char **args, unsigned int argCount,
     CMSWTORouteInfo *routeInfo
 ) {
+
+  const CMSModifyCommand command = {
+       .routeInfo = *routeInfo,
+       .commandVerb = commandVerb,
+       .target = target,
+       .args = (const char* const*)args,
+       .argCount = argCount,
+   };
+
+
+  reportCommandRetrieval(commandVerb, target, args, argCount, routeInfo);
+
+  if (server->commandTaskCount >= CROSS_MEMORY_SERVER_MAX_CMD_TASK_NUM) {
+    zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_INFO, CMS_LOG_CMD_REJECTED_BUSY_MSG,
+            commandVerb, target);
+    wtoPrintf2(routeInfo->consoleID, routeInfo->cart,
+               CMS_LOG_CMD_REJECTED_BUSY_MSG, commandVerb, target);
+    return;
+  }
+
+  CMSModifyCommandStatus status = CMS_MODIFY_COMMAND_STATUS_UNKNOWN;
+  CMSModifyCommandCallback *userCallback = server->commandCallback;
+  if (userCallback != NULL) {
+
+    ABENDInfo abendInfo = {ABEND_INFO_EYECATCHER};
+    int recoveryRC = recoveryPush(
+        "plugin command handler",
+        RCVR_FLAG_RETRY | RCVR_FLAG_DELETE_ON_RETRY | RCVR_FLAG_PRODUCE_DUMP,
+        "plugin command handler",
+        extractABENDInfo, &abendInfo,
+        NULL, NULL
+    );
+
+    if (recoveryRC == RC_RCV_OK) {
+
+      userCallback(server->globalArea, &command, &status, server->callbackData);
+
+    } else {
+      zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_SEVERE, CMS_LOG_STEP_ABEND_MSG,
+              abendInfo.completionCode, abendInfo.reasonCode,
+              "user command handler", recoveryRC);
+      status = CMS_MODIFY_COMMAND_STATUS_REJECTED;
+    }
+
+    if (recoveryRC == RC_RCV_OK) {
+      recoveryPop();
+    }
+
+  }
+
+  reportCommandStatus(commandVerb, target, args, argCount, routeInfo, status);
+
+}
+
+static void passCommandToCMSCommandHandlers(
+    CrossMemoryServer *server,
+    char *commandVerb,
+    char *target,
+    char **args, unsigned int argCount,
+    CMSWTORouteInfo *routeInfo
+) {
+
+  reportCommandRetrieval(commandVerb, target, args, argCount, routeInfo);
 
   CMSModifyCommandStatus status = CMS_MODIFY_COMMAND_STATUS_UNKNOWN;
 
-  CMSModifyCommandCallback *userCallback = server->commandCallback;
-
-  if (userCallback == NULL) {
-    return status;
+  if (strcmp(commandVerb, CMS_COMMAND_VERB_LOG) == 0) {
+    status = handleCommandVerbLog(server, args, argCount, routeInfo);
+  } else if (strcmp(commandVerb, CMS_COMMAND_VERB_FLUSH) == 0) {
+    status = handleCommandVerbFlush(server, args, argCount, routeInfo);
+  } else if (strcmp(commandVerb, CMS_COMMAND_VERB_DISPLAY_ABBRV) == 0 ||
+             strcmp(commandVerb, CMS_COMMAND_VERB_DISPLAY_SHORT) == 0 ||
+             strcmp(commandVerb, CMS_COMMAND_VERB_DISPLAY) == 0) {
+    status = handleCommandVerbDisplay(server, args, argCount, routeInfo);
+  } else {
+    status = CMS_MODIFY_COMMAND_STATUS_UNKNOWN;
   }
 
-  const CMSModifyCommand command = {
-      .routeInfo = routeInfo,
-      .commandVerb = verb,
-      .args = (const char* const*)args,
-      .argCount = argCount,
-  };
+  reportCommandStatus(commandVerb, target, args, argCount, routeInfo, status);
 
-  userCallback(server->globalArea, &command, &status, server->callbackData);
-
-  return status;
 }
 
-static CMSModifyCommandStatus passCommandToCMSCommandHandlers(
-    CrossMemoryServer *server,
-    char *commandVerb,
-    char **args, unsigned int argCount,
-    CMSWTORouteInfo *routeInfo
-) {
+static void splitVerbAndTarget(char **verb, char **target) {
 
-  if (strcmp(commandVerb, CMS_COMMAND_VERB_LOG) == 0) {
-    handleCommandVerbLog(server, args, argCount, routeInfo);
-  } else if (strcmp(commandVerb, CMS_COMMAND_VERB_FLUSH) == 0) {
-    handleCommandVerbFlush(server, args, argCount, routeInfo);
-  } else if (strcmp(commandVerb, CMS_COMMAND_VERB_DISPLAY) == 0 ||
-             strcmp(commandVerb, CMS_COMMAND_VERB_DISPLAY_ABBRV) == 0) {
-    handleCommandVerbDisplay(server, args, argCount, routeInfo);
-  } else {
-    return CMS_MODIFY_COMMAND_STATUS_UNKNOWN;
+  char *v = *verb;
+
+  size_t verbLength = strlen(v);
+
+  char *openParen = strchr(v, '(');
+  char *closeParen = strchr(v, ')');
+
+  if (openParen == NULL || closeParen == NULL) {
+    return;
   }
 
-  return CMS_MODIFY_COMMAND_STATUS_PROCESSED;
+  if (closeParen != (v + verbLength - 1)) {
+    return;
+  }
+
+  *openParen = '\0';
+  *closeParen = '\0';
+
+  *verb = v;
+  *target = openParen + 1;
+
+}
+
+static void handleAsyncModifyCommand(CrossMemoryServer *server,
+                                     const char *command,
+                                     unsigned short commandLength,
+                                     CMSWTORouteInfo routeInfo) {
+
+  int consoleID = routeInfo.consoleID;
+  CART cart = routeInfo.cart;
+
+  int slhBlockSize = 4096;
+  int slhMaxBlockNumber = 4;
+  ShortLivedHeap *slh = makeShortLivedHeap(slhBlockSize, slhMaxBlockNumber);
+  if (slh == NULL) {
+    zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_SEVERE, CMS_LOG_ALLOC_FAILURE_MSG,
+            "SLH", slhBlockSize);
+    wtoPrintf2(consoleID, cart, CMS_LOG_ALLOC_FAILURE_MSG,
+               "SLH", slhBlockSize);
+    return;
+  }
+
+  unsigned int commandTokenCount = 0;
+  char **commandTokens = tokenizeModifyCommand(slh, command, commandLength,
+                                               &commandTokenCount);
+
+   if (commandTokens != NULL) {
+
+     if (commandTokenCount > 0) {
+
+       char *commandVerb = commandTokens[0];
+       char **args = commandTokens + 1;
+       unsigned int argCount = commandTokenCount - 1;
+       char *target = NULL;
+       splitVerbAndTarget(&commandVerb, &target);
+
+       if (target == NULL) {
+         passCommandToCMSCommandHandlers(server, commandVerb,
+                                         target,
+                                         args, argCount,
+                                         &routeInfo);
+       } else {
+         passCommandToUserCallback(server, commandVerb,
+                                   target,
+                                   args, argCount,
+                                   &routeInfo);
+       }
+
+     } else {
+       zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_WARNING, CMS_LOG_EMPTY_CMD_MSG);
+       wtoPrintf2(consoleID, cart, CMS_LOG_EMPTY_CMD_MSG);
+     }
+
+   } else {
+     zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_SEVERE,
+             CMS_LOG_CMD_TKNZ_FAILURE_MSG);
+     zowedump(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_SEVERE,
+              (void *)command, commandLength);
+     wtoPrintf2(consoleID, cart, CMS_LOG_CMD_TKNZ_FAILURE_MSG);
+   }
+
+}
+
+static int commandTaskHandler(RLETask *rleTask) {
+
+  CommandTaskContext *context = rleTask->userPointer;
+  CrossMemoryServer *server = context->server;
+  atomicIncrement(&server->commandTaskCount, 1);
+
+  char *command = context->command;
+  unsigned short commandLength = context->commandLength;
+  CMSWTORouteInfo routeInfo = context->routeInfo;
+
+  CMSModifyCommandStatus status = CMS_MODIFY_COMMAND_STATUS_UNKNOWN;
+  CMSModifyCommandCallback *userCallback = server->commandCallback;
+  if (userCallback != NULL) {
+
+    ABENDInfo abendInfo = {ABEND_INFO_EYECATCHER};
+    int recoveryRC = recoveryPush(
+        "async command handler",
+        RCVR_FLAG_RETRY | RCVR_FLAG_DELETE_ON_RETRY | RCVR_FLAG_PRODUCE_DUMP,
+        "async command handler",
+        extractABENDInfo, &abendInfo,
+        NULL, NULL
+    );
+
+    if (recoveryRC == RC_RCV_OK) {
+
+      handleAsyncModifyCommand(server, command, commandLength, routeInfo);
+
+    } else {
+
+      zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_SEVERE, CMS_LOG_STEP_ABEND_MSG,
+              abendInfo.completionCode, abendInfo.reasonCode,
+              "async command handler", recoveryRC);
+      status = CMS_MODIFY_COMMAND_STATUS_REJECTED;
+
+    }
+
+    if (recoveryRC == RC_RCV_OK) {
+      recoveryPop();
+    }
+
+  }
+
+  destroyCommandTaskContext(context);
+  context = NULL;
+
+  atomicIncrement(&server->commandTaskCount, -1);
+  return 0;
+}
+
+static void handleCommandAsynchronously(CrossMemoryServer *server,
+                                        const char *command,
+                                        unsigned short commandLength,
+                                        const CMSWTORouteInfo *routeInfo) {
+
+  if (server->commandTaskCount >= CROSS_MEMORY_SERVER_MAX_CMD_TASK_NUM) {
+    zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_INFO,
+            CMS_LOG_CMD_REJECTED_BUSY_MSG);
+    wtoPrintf2(routeInfo->consoleID, routeInfo->cart,
+               CMS_LOG_CMD_REJECTED_BUSY_MSG);
+    return;
+  }
+
+  CommandTaskContext *taskContext = makeCommandTaskContext(server,
+                                                           command,
+                                                           commandLength,
+                                                           routeInfo);
+  if (taskContext == NULL) {
+    zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_SEVERE, CMS_LOG_RES_NOT_CREATED_MSG,
+            "command task context", 0);
+    return;
+  }
+
+  RLETask *task = makeRLETask(
+      server->base->rleAnchor,
+      RLE_TASK_TCB_CAPABLE | RLE_TASK_RECOVERABLE | RLE_TASK_DISPOSABLE,
+      commandTaskHandler
+  );
+
+  if (task == NULL) {
+    zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_SEVERE, CMS_LOG_RES_NOT_CREATED_MSG,
+            "RLE task", 0);
+    destroyCommandTaskContext(taskContext);
+    taskContext = NULL;
+    return;
+  }
+
+  task->userPointer = taskContext;
+
+  startRLETask(task, NULL);
+
+  task = NULL;
+  taskContext = NULL;
+
 }
 
 static int handleModifyCommand(STCBase *base, CIB *cib, STCConsoleCommandType commandType, const char *command, unsigned short commandLength, void *userData) {
@@ -2838,43 +3190,7 @@ static int handleModifyCommand(STCBase *base, CIB *cib, STCConsoleCommandType co
 
   if (commandType == STC_COMMAND_MODIFY) {
 
-    unsigned int commandTokenCount = 0;
-    char **commandTokens = tokenizeModifyCommand(slh, command, commandLength, &commandTokenCount);
-    if (commandTokens != NULL) {
-
-      if (commandTokenCount > 0) {
-
-        char *commandVerb = commandTokens[0];
-        char **args = commandTokens + 1;
-        unsigned int argCount = commandTokenCount - 1;
-
-        CMSModifyCommandStatus status = CMS_MODIFY_COMMAND_STATUS_UNKNOWN;
-
-        status = passCommandToUserCallback(server, commandVerb,
-                                           args, argCount,
-                                           &routeInfo);
-
-        if (status != CMS_MODIFY_COMMAND_STATUS_CONSUMED) {
-          status = passCommandToCMSCommandHandlers(server, commandVerb,
-                                                   args, argCount,
-                                                   &routeInfo);
-        }
-
-        if (status == CMS_MODIFY_COMMAND_STATUS_UNKNOWN) {
-          zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_WARNING, CMS_LOG_BAD_CMD_MSG, commandVerb);
-          wtoPrintf2(consoleID, cart, CMS_LOG_BAD_CMD_MSG, commandVerb);
-        }
-
-      } else {
-        zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_WARNING, CMS_LOG_EMPTY_CMD_MSG);
-        wtoPrintf2(consoleID, cart, CMS_LOG_EMPTY_CMD_MSG);
-      }
-
-    } else {
-      zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_SEVERE, CMS_LOG_CMD_TKNZ_FAILURE_MSG);
-      zowedump(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_SEVERE, (void *)command, commandLength);
-      wtoPrintf2(consoleID, cart, CMS_LOG_CMD_TKNZ_FAILURE_MSG);
-    }
+    handleCommandAsynchronously(server, command, commandLength, &routeInfo);
 
   } else if (commandType == STC_COMMAND_START) {
 
@@ -2919,7 +3235,6 @@ static int handleModifyCommand(STCBase *base, CIB *cib, STCConsoleCommandType co
       globalArea->serverFlags |= CROSS_MEMORY_SERVER_FLAG_TERM_STARTED;
     }
 
-    wtoPrintf2(consoleID, cart, CMS_LOG_CMD_ACCEPTED_MSG, "Termination");
   }
 
   SLHFree(slh);

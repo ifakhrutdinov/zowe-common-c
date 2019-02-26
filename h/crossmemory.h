@@ -163,6 +163,8 @@ typedef struct ELXLIST_tag {
 
 #define CROSS_MEMEORY_SERVER_MAX_SERVICE_COUNT   (CROSS_MEMORY_SERVER_MAX_SERVICE_ID + 1)
 
+#define CROSS_MEMORY_SERVER_MAX_CMD_TASK_NUM  30
+
 typedef struct CrossMemoryServerGlobalArea_tag;
 typedef struct CrossMemoryService_tag;
 
@@ -248,8 +250,9 @@ typedef struct CMSWTORouteInfo_tag {
 } CMSWTORouteInfo;
 
 typedef struct CMSModifyCommand_tag {
-  const CMSWTORouteInfo *routeInfo;
+  CMSWTORouteInfo routeInfo;
   const char *commandVerb;
+  const char *target;
   const char* const* args;
   unsigned int argCount;
 } CMSModifyCommand;
@@ -258,6 +261,7 @@ typedef enum CMSModifyCommandStatus_tag {
   CMS_MODIFY_COMMAND_STATUS_UNKNOWN = 1,
   CMS_MODIFY_COMMAND_STATUS_PROCESSED = 2,
   CMS_MODIFY_COMMAND_STATUS_CONSUMED = 3,
+  CMS_MODIFY_COMMAND_STATUS_REJECTED = 4,
 } CMSModifyCommandStatus;
 
 typedef int (CMSStarCallback)(CrossMemoryServerGlobalArea *globalArea,
@@ -281,6 +285,7 @@ typedef struct CrossMemoryServer_tag {
   CMSStarCallback * __ptr32 startCallback;
   CMSStopCallback * __ptr32 stopCallback;
   CMSModifyCommandCallback * __ptr32 commandCallback;
+  int commandTaskCount;
   PAD_LONG(0, void *callbackData);
   CrossMemoryServerGlobalArea * __ptr32 globalArea;
   CMSWTORouteInfo startCommandInfo;
@@ -646,13 +651,13 @@ CrossMemoryServerName cmsMakeServerName(const char *nameNullTerm);
 #ifndef CMS_LOG_CMD_RECEIVED_MSG_ID
 #define CMS_LOG_CMD_RECEIVED_MSG_ID             CMS_MSG_PRFX"0220I"
 #endif
-#define CMS_LOG_CMD_RECEIVED_MSG_TEXT           "%s command received (\'%s\', \'%s\', \'%s\')"
+#define CMS_LOG_CMD_RECEIVED_MSG_TEXT           "Modify %s command received"
 #define CMS_LOG_CMD_RECEIVED_MSG                CMS_LOG_CMD_RECEIVED_MSG_ID" "CMS_LOG_CMD_RECEIVED_MSG_TEXT
 
 #ifndef CMS_LOG_CMD_ACCEPTED_MSG_ID
 #define CMS_LOG_CMD_ACCEPTED_MSG_ID             CMS_MSG_PRFX"0221I"
 #endif
-#define CMS_LOG_CMD_ACCEPTED_MSG_TEXT           "%s command accepted"
+#define CMS_LOG_CMD_ACCEPTED_MSG_TEXT           "Modify %s command accepted"
 #define CMS_LOG_CMD_ACCEPTED_MSG                CMS_LOG_CMD_ACCEPTED_MSG_ID" "CMS_LOG_CMD_ACCEPTED_MSG_TEXT
 
 #ifndef CMS_LOG_DISP_CMD_RESULT_MSG_ID
@@ -688,7 +693,7 @@ CrossMemoryServerName cmsMakeServerName(const char *nameNullTerm);
 #ifndef CMS_LOG_BAD_CMD_MSG_ID
 #define CMS_LOG_BAD_CMD_MSG_ID                  CMS_MSG_PRFX"0227W"
 #endif
-#define CMS_LOG_BAD_CMD_MSG_TEXT                "Command verb \'%s\' not recognized, command ignored"
+#define CMS_LOG_BAD_CMD_MSG_TEXT                "Modify %s command not recognized"
 #define CMS_LOG_BAD_CMD_MSG                     CMS_LOG_BAD_CMD_MSG_ID" "CMS_LOG_BAD_CMD_MSG_TEXT
 
 #ifndef CMS_LOG_EMPTY_CMD_MSG_ID
@@ -774,6 +779,30 @@ CrossMemoryServerName cmsMakeServerName(const char *nameNullTerm);
 #endif
 #define CMS_LOG_BAD_SERVICE_ADDR_ID_MSG_TEXT    "Service with ID %d not relocated, 0x%p not in range [0x%p, 0x%p]"
 #define CMS_LOG_BAD_SERVICE_ADDR_ID_MSG         CMS_LOG_BAD_SERVICE_ADDR_ID_MSG_ID" "CMS_LOG_BAD_SERVICE_ADDR_ID_MSG_TEXT
+
+#ifndef CMS_LOG_CMD_REJECTED_MSG_ID
+#define CMS_LOG_CMD_REJECTED_MSG_ID             CMS_MSG_PRFX"0242W"
+#endif
+#define CMS_LOG_CMD_REJECTED_MSG_TEXT           "Modify %s command rejected"
+#define CMS_LOG_CMD_REJECTED_MSG                CMS_LOG_CMD_REJECTED_MSG_ID" "CMS_LOG_CMD_REJECTED_MSG_TEXT
+
+#ifndef CMS_LOG_CMD_REJECTED_BUSY_MSG_ID
+#define CMS_LOG_CMD_REJECTED_BUSY_MSG_ID        CMS_MSG_PRFX"0243W"
+#endif
+#define CMS_LOG_CMD_REJECTED_BUSY_MSG_TEXT      "server busy, modify commands are rejected"
+#define CMS_LOG_CMD_REJECTED_BUSY_MSG           CMS_LOG_CMD_REJECTED_BUSY_MSG_ID" "CMS_LOG_CMD_REJECTED_BUSY_MSG_TEXT
+
+#ifndef CMS_LOG_RES_NOT_CREATED_MSG_ID
+#define CMS_LOG_RES_NOT_CREATED_MSG_ID          CMS_MSG_PRFX"0244E"
+#endif
+#define CMS_LOG_RES_NOT_CREATED_MSG_TEXT        "Resource '%s' not created, RC = %d"
+#define CMS_LOG_RES_NOT_CREATED_MSG             CMS_LOG_RES_NOT_CREATED_MSG_ID" "CMS_LOG_RES_NOT_CREATED_MSG_TEXT
+
+#ifndef CMS_LOG_STEP_ABEND_MSG_ID
+#define CMS_LOG_STEP_ABEND_MSG_ID               CMS_MSG_PRFX"0245E"
+#endif
+#define CMS_LOG_STEP_ABEND_MSG_TEXT             "ABEND S%03X-%02X averted in step '%s' (recovery RC = %d)"
+#define CMS_LOG_STEP_ABEND_MSG                  CMS_LOG_STEP_ABEND_MSG_ID" "CMS_LOG_STEP_ABEND_MSG_TEXT
 
 #endif /* H_CROSSMEMORY_H_ */
 
