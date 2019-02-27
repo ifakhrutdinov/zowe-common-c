@@ -374,6 +374,7 @@ ZOWE_PRAGMA_PACK_RESET
 #define cmsRegisterService CMCMSRSR
 #define cmsStartMainLoop CMCMAINL
 #define cmsGetGlobalArea CMGETGA
+#define cmsGetActiveGlobalArea CMGETAGA
 #define cmCopyToSecondaryWithCallerKey CMCPTSSK
 #define cmCopyFromSecondaryWithCallerKey CMCPFSSK
 #define cmCopyToPrimaryWithCallerKey CMCPTPSK
@@ -410,6 +411,8 @@ void removeCrossMemoryServer(CrossMemoryServer *server);
 int cmsRegisterService(CrossMemoryServer *server, int id, CrossMemoryServiceFunction *serviceFunction, void *serviceData, int flags);
 int cmsStartMainLoop(CrossMemoryServer *server);
 int cmsGetGlobalArea(const CrossMemoryServerName *serverName, CrossMemoryServerGlobalArea **globalAreaAddress);
+int cmsGetActiveGlobalArea(const CrossMemoryServerName *serverName,
+                           CrossMemoryServerGlobalArea **globalAreaAddress);
 void cmCopyToSecondaryWithCallerKey(void *dest, const void *src, size_t size);
 void cmCopyFromSecondaryWithCallerKey(void *dest, const void *src, size_t size);
 void cmCopyToPrimaryWithCallerKey(void *dest, const void *src, size_t size);

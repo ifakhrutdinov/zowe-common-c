@@ -4124,9 +4124,8 @@ int cmsStartMainLoop(CrossMemoryServer *srv) {
 
 #endif /* METTLE */
 
-int cmsGetGlobalArea(const CrossMemoryServerName *serverName, CrossMemoryServerGlobalArea **globalAreaAddress) {
-
-#ifdef CROSS_MEMORY_SERVER_DEBUG
+static int getDebugModeGlobalArea(const CrossMemoryServerName *serverName,
+                                  CrossMemoryServerGlobalArea **globalAreaAddress) {
 
   NameTokenUserName ntName;
   memcpy(ntName.name, serverName->nameSpacePadded, sizeof(ntName.name));
@@ -4150,6 +4149,25 @@ int cmsGetGlobalArea(const CrossMemoryServerName *serverName, CrossMemoryServerG
   *globalAreaAddress = globalArea;
   return RC_CMS_OK;
 
+}
+
+int cmsGetGlobalArea(const CrossMemoryServerName *serverName, CrossMemoryServerGlobalArea **globalAreaAddress) {
+
+#ifdef CROSS_MEMORY_SERVER_DEBUG
+
+  CrossMemoryServerGlobalArea *debugGlobalArea = NULL;
+  int getRC = getDebugModeGlobalArea(serverName, &debugGlobalArea);
+  if (getRC != RC_CMS_OK) {
+    return getRC;
+  }
+
+  if (debugGlobalArea->version == CROSS_MEMORY_SERVER_VERSION) {
+    *globalAreaAddress = debugGlobalArea;
+    return RC_CMS_OK;
+  }
+
+  return RC_CMS_GLOBAL_AREA_NULL;
+
 #else
 
   ZVT *zvt = zvtGet();
@@ -4170,13 +4188,69 @@ int cmsGetGlobalArea(const CrossMemoryServerName *serverName, CrossMemoryServerG
     if (globalAreaCandidate != NULL) {
       if (memcmp(&globalAreaCandidate->serverName, serverName, sizeof(CrossMemoryServerName)) == 0 &&
           globalAreaCandidate->version == CROSS_MEMORY_SERVER_VERSION) {
-        /* TODO: make a new function that finds a running server by name
-         * The version check should be done when we've found a running instance,
-         * otherwise it is not clear whether global are is NULL because it's
-         * not been allocated or the caller's and server's versions don't
-         * match. */
         globalArea = globalAreaCandidate;
         break;
+      }
+    }
+
+    currZVTE = (ZVTEntry *)currZVTE->next;
+  }
+
+  if (entryIdx == CMS_MAX_ZVTE_CHAIN_LENGTH) {
+    return RC_CMS_ZVTE_CHAIN_LOOP;
+  }
+
+  if (globalArea == NULL) {
+    return RC_CMS_GLOBAL_AREA_NULL;
+  }
+
+  *globalAreaAddress = globalArea;
+  return RC_CMS_OK;
+
+#endif
+}
+
+int cmsGetActiveGlobalArea(const CrossMemoryServerName *serverName,
+                           CrossMemoryServerGlobalArea **globalAreaAddress) {
+
+#ifdef CROSS_MEMORY_SERVER_DEBUG
+
+  CrossMemoryServerGlobalArea *debugGlobalArea = NULL;
+  int getRC = getDebugModeGlobalArea(serverName, &debugGlobalArea);
+  if (getRC != RC_CMS_OK) {
+    return getRC;
+  }
+
+  return RC_CMS_GLOBAL_AREA_NULL;
+
+#else
+
+  ZVT *zvt = zvtGet();
+  if (zvt == NULL) {
+    return RC_CMS_ZVT_NULL;
+  }
+
+  CrossMemoryServerGlobalArea *globalArea = NULL;
+  ZVTEntry *currZVTE = zvt->zvteSlots.zis;
+  int entryIdx = 0;
+  for (entryIdx = 0; entryIdx < CMS_MAX_ZVTE_CHAIN_LENGTH; entryIdx++) {
+
+    if (currZVTE == NULL) {
+      break;
+    }
+
+    CrossMemoryServerGlobalArea *globalAreaCandidate =
+        (CrossMemoryServerGlobalArea *)currZVTE->productAnchor;
+    if (globalAreaCandidate != NULL) {
+      if (memcmp(&globalAreaCandidate->serverName, serverName,
+                 sizeof(CrossMemoryServerName)) == 0) {
+
+        if ((globalAreaCandidate->serverFlags & CROSS_MEMORY_SERVER_FLAG_READY) &&
+            globalAreaCandidate->pcInfo.pccpPCNumber != 0) {
+          globalArea = globalAreaCandidate;
+          break;
+        }
+
       }
     }
 
@@ -4252,7 +4326,7 @@ int cmsCallService(const CrossMemoryServerName *serverName, int serviceID, void 
   }
 
   CrossMemoryServerGlobalArea *globalArea = NULL;
-  int getRC = cmsGetGlobalArea(serverName, &globalArea);
+  int getRC = cmsGetActiveGlobalArea(serverName, &globalArea);
   if (getRC != RC_CMS_OK) {
     return getRC;
   }
