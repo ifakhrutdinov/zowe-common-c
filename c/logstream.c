@@ -27,7 +27,7 @@
 xlc "-Wa,goff" \
 "-Wc,LANGLVL(EXTC99),FLOAT(HEX),agg,exp,list(),so(),goff,xref,gonum,roconst,gonum,ASM,ASMLIB('SYS1.MACLIB'),LP64,XPLINK" \
 -DCMS_CLIENT -D_OPEN_THREADS=1  -I $COMMON/h -I ../h -o logstream logstream.c \
-$COMMON/c/alloc.c \
+alloc.c \
 
 */
 
@@ -74,9 +74,9 @@ int logstreamDefineStruct(const LogstreamStructName *name,
       ",RETCODE=%[rc]"
       ",RSNCODE=%[rsn]"
       ",MF=(E,%[plist],COMPLETE)"
-      ""
+      "                                                                        \n"
 
-      : [rc]"=m"(below2G->rc), [rsn]"=m"(below2G->rc)
+      : [rc]"=m"(below2G->rc), [rsn]"=m"(below2G->rsn)
 
       : [structName]"m"(below2G->name),
         [logNum]"m"(below2G->maxLogNumber),
@@ -99,13 +99,85 @@ int logstreamDefineStruct(const LogstreamStructName *name,
 
   return rc;
 }
+
+int logstreamDefineCFLogstream(const LogstreamName *streamName,
+                               const LogstreamStructName *structName,
+                               const LogstreamDescription *description,
+                               int *rsn) {
+
+
+  ALLOC_STRUCT31(
+    STRUCT31_NAME(below2G),
+    STRUCT31_FIELDS(
+      LogstreamName streamName;
+      LogstreamStructName structName;
+      LogstreamDescription description;
+      char answerArea[40]; /* IXGANSAA  */
+      unsigned int answerAreaLength;
+      char plist[512];
+      int rc;
+      int rsn;
+    )
+  );
+
+
+  below2G->streamName = *streamName;
+  below2G->structName = *structName;
+  below2G->description = *description;
+  below2G->answerAreaLength = sizeof(below2G->answerArea);
+
+  __asm(
+
+      ASM_PREFIX
+      "         IXGINVNT REQUEST=DEFINE"
+      ",TYPE=LOGSTREAM"
+      ",STREAMNAME=%[streamName]"
+      ",STRUCTNAME=%[structName]"
+      ",DASDONLY=NO"
+      ",DESCRIPTION=%[description]"
+      ",ANSAREA=%[answerArea]"
+      ",ANSLEN=%[answerAreaLen]"
+      ",RETCODE=%[rc]"
+      ",RSNCODE=%[rsn]"
+      ",MF=(E,%[plist],COMPLETE)"
+      "                                                                        \n"
+
+      : [rc]"=m"(below2G->rc), [rsn]"=m"(below2G->rsn)
+
+      : [streamName]"m"(below2G->streamName),
+        [structName]"m"(below2G->structName),
+        [description]"m"(below2G->description),
+        [answerArea]"m"(below2G->answerArea),
+        [answerAreaLen]"m"(below2G->answerAreaLength),
+        [plist]"m"(below2G->plist)
+
+      : "r0", "r1", "r14", "r15"
+
+  );
+
+  int rc = below2G->rc;
+  *rsn = below2G->rsn;
+
+  FREE_STRUCT31(
+    STRUCT31_NAME(below2G)
+  );
+
+  return rc;
+}
+
 int main() {
 
   LogstreamStructName structName = {"IREK            "};
   int rc = 0, rsn = 0;
   rc = logstreamDefineStruct(&structName, 2, 4096, 1024, &rsn);
 
-  printf("rc = %d, rsn = %d\n", rc, rsn);
+  printf("define struct rc = %d, rsn = 0x%08X\n", rc, rsn);
+
+  LogstreamName streamName = {"TEST.STREAM               "};
+  LogstreamDescription description = {"THIS_IS_A_TEST  "};
+  rc = logstreamDefineCFLogstream(&streamName, &structName, &description, &rsn);
+
+  printf("define stream rc = %d, rsn = 0x%08X\n", rc, rsn);
 
   return 0;
 }
