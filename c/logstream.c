@@ -406,7 +406,7 @@ int logstreamBrowseStart(const LogstreamToken *streamToken,
 }
 
 int logstreamBrowseReset(const LogstreamToken *streamToken,
-                         LogstreamBrowseToken *browseToken,
+                         const LogstreamBrowseToken *browseToken,
                          bool toYoungest,
                          LogstreamECB * __ptr32 completionECB,
                          int *rsn) {
@@ -493,7 +493,6 @@ int logstreamBrowseReset(const LogstreamToken *streamToken,
 
   );
 
-  *browseToken = below2G->browseToken;
   int rc = below2G->rc;
   *rsn = below2G->rsn;
 
@@ -504,6 +503,155 @@ int logstreamBrowseReset(const LogstreamToken *streamToken,
   return rc;
 }
 
+static bool isAddr64(void *addr) {
+
+  if (sizeof(addr) < 8) {
+    return false;
+  }
+
+  return ((uint64)addr & 0xFFFFFFFF00000000) > 0;
+}
+
+int logstreamReadCursor(const LogstreamToken *streamToken,
+                        const LogstreamBrowseToken *browseToken,
+                        bool youngToOld,
+                        void *resultBuffer,
+                        unsigned int resultBufferSize,
+                        unsigned int *spaceRequired,
+                        LogstreamECB * __ptr32 completionECB,
+                        int *rsn) {
+
+  ALLOC_STRUCT31(
+    STRUCT31_NAME(below2G),
+    STRUCT31_FIELDS(
+      LogstreamToken streamToken;
+      LogstreamBrowseToken browseToken;
+      unsigned int resultBufferSize;
+      unsigned int spaceRequired;
+      char answerArea[40]; /* IXGANSAA  */
+      unsigned int answerAreaLength;
+      char plist[512];
+      int rc;
+      int rsn;
+    )
+  );
+
+
+  below2G->streamToken = *streamToken;
+  below2G->browseToken = *browseToken;
+  below2G->resultBufferSize = resultBufferSize;
+  below2G->answerAreaLength = sizeof(below2G->answerArea);
+
+  /* Init required parameters. */
+  if (isAddr64(resultBuffer)) {
+    __asm(
+
+        ASM_PREFIX
+        "         IXGBRWSE REQUEST=READCURSOR"
+        ",STREAMTOKEN=%[streamToken]"
+        ",BROWSETOKEN=%[browseToken]"
+        ",BUFFER64=(%[buffer])"
+        ",BUFFLEN=%[bufferLen]"
+        ",DIRECTION=OLDTOYOUNG"
+        ",ANSAREA=%[answerArea]"
+        ",ANSLEN=%[answerAreaLen]"
+        ",MF=(M,%[plist],COMPLETE)"
+        "                                                                        \n"
+
+        :
+
+        : [streamToken]"m"(below2G->streamToken),
+          [browseToken]"m"(below2G->browseToken),
+          [buffer]"r"(resultBuffer),
+          [bufferLen]"m"(below2G->resultBufferSize),
+          [answerArea]"m"(below2G->answerArea),
+          [answerAreaLen]"m"(below2G->answerAreaLength),
+          [plist]"m"(below2G->plist)
+
+        : "r0", "r1", "r14", "r15"
+
+    );
+  } else {
+    __asm(
+
+        ASM_PREFIX
+        "         IXGBRWSE REQUEST=READCURSOR"
+        ",STREAMTOKEN=%[streamToken]"
+        ",BROWSETOKEN=%[browseToken]"
+        ",BUFFER=(%[buffer])"
+        ",BUFFLEN=%[bufferLen]"
+        ",DIRECTION=OLDTOYOUNG"
+        ",ANSAREA=%[answerArea]"
+        ",ANSLEN=%[answerAreaLen]"
+        ",MF=(M,%[plist],COMPLETE)"
+        "                                                                        \n"
+
+        :
+
+        : [streamToken]"m"(below2G->streamToken),
+          [browseToken]"m"(below2G->browseToken),
+          [buffer]"r"(resultBuffer),
+          [bufferLen]"m"(below2G->resultBufferSize),
+          [answerArea]"m"(below2G->answerArea),
+          [answerAreaLen]"m"(below2G->answerAreaLength),
+          [plist]"m"(below2G->plist)
+
+        : "r0", "r1", "r14", "r15"
+
+    );
+  }
+
+  /* Modify parameters. */
+  if (youngToOld) {
+    __asm(
+        ASM_PREFIX
+        "         IXGBRWSE REQUEST=READCURSOR"
+        ",DIRECTION=YOUNGTOOLD,MF=(M,%[plist],NOCHECK)"
+        : : [plist]"m"(below2G->plist) : "r0", "r1", "r14", "r15"
+    );
+  }
+
+  if (completionECB != NULL) {
+    __asm(
+        ASM_PREFIX
+        "         IXGBRWSE REQUEST=READCURSOR,MODE=SYNCECB,ECB=(%[ecb])"
+        ",MF=(M,%[plist],NOCHECK)"
+        :
+        : [ecb]"r"(completionECB), [plist]"m"(below2G->plist)
+        : "r0", "r1", "r14", "r15"
+    );
+  }
+
+  /* Execute request. */
+  __asm(
+
+      ASM_PREFIX
+      "         IXGBRWSE REQUEST=READCURSOR"
+      ",BLKSIZE=%[requiredSpace]"
+      ",RETCODE=%[rc]"
+      ",RSNCODE=%[rsn]"
+      ",MF=(E,%[plist],NOCHECK)"
+      "                                                                        \n"
+
+      : [requiredSpace]"=m"(below2G->spaceRequired),
+        [rc]"=m"(below2G->rc), [rsn]"=m"(below2G->rsn)
+
+      : [plist]"m"(below2G->plist)
+
+      : "r0", "r1", "r14", "r15"
+
+  );
+
+  *spaceRequired = below2G->spaceRequired;
+  int rc = below2G->rc;
+  *rsn = below2G->rsn;
+
+  FREE_STRUCT31(
+    STRUCT31_NAME(below2G)
+  );
+
+  return rc;
+}
 
 int main() {
 
@@ -539,6 +687,22 @@ int main() {
   printf("browse token:\n");
   dumpbuffer((char *)&browseToken, sizeof(browseToken));
   printf("disconnect rc = %d, rsn = 0x%08X\n", rc, rsn);
+
+  for (int i = 0; i < 5; i++) {
+
+    char resultBuffer[512] = {0};
+    unsigned int resultBufferSize = sizeof(resultBuffer);
+    unsigned int requiredSize = 0;
+
+    rc = logstreamReadCursor(&token, &browseToken, true,
+                             resultBuffer, resultBufferSize, &requiredSize,
+                             NULL, &rsn);
+
+    printf("read rc = %d, rsn = 0x%08X, required size = %u\n", rc, rsn,
+           requiredSize);
+    dumpbuffer(resultBuffer, resultBufferSize);
+
+  }
 
   rc = logstreamDisconntect(&token, &rsn);
   printf("disconnect rc = %d, rsn = 0x%08X\n", rc, rsn);
