@@ -10,9 +10,16 @@
   Copyright Contributors to the Zowe Project.
 */
 
+#ifdef METTLE
+#include <metal/metal.h>
+#include <metal/stddef.h>
+#include <metal/stdio.h>
+#include <metal/string.h>
+#else
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#endif
 
 #include "zowetypes.h"
 #include "alloc.h"
@@ -338,9 +345,9 @@ int logstreamDeleteLogstream(const LogstreamName *name, int *rsn) {
 }
 
 int logstreamConnect(const LogstreamName *streamName,
-                      bool readOnly,
-                      LogstreamToken *token,
-                      int *rsn) {
+                     bool readOnly,
+                     LogstreamToken *token,
+                     int *rsn) {
 
   ALLOC_STRUCT31(
     STRUCT31_NAME(below2G),
