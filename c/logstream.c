@@ -100,6 +100,58 @@ int logstreamDefineStruct(const LogstreamStructName *name,
   return rc;
 }
 
+int logstreamDeleteStruct(const LogstreamStructName *name, int *rsn) {
+
+  ALLOC_STRUCT31(
+    STRUCT31_NAME(below2G),
+    STRUCT31_FIELDS(
+      LogstreamStructName name;
+      char answerArea[40]; /* IXGANSAA  */
+      unsigned int answerAreaLength;
+      char plist[512];
+      int rc;
+      int rsn;
+    )
+  );
+
+
+  below2G->name = *name;
+  below2G->answerAreaLength = sizeof(below2G->answerArea);
+
+  __asm(
+
+      ASM_PREFIX
+      "         IXGINVNT REQUEST=DELETE"
+      ",TYPE=STRUCTURE"
+      ",STRUCTNAME=%[structName]"
+      ",ANSAREA=%[answerArea]"
+      ",ANSLEN=%[answerAreaLen]"
+      ",RETCODE=%[rc]"
+      ",RSNCODE=%[rsn]"
+      ",MF=(E,%[plist],COMPLETE)"
+      "                                                                        \n"
+
+      : [rc]"=m"(below2G->rc), [rsn]"=m"(below2G->rsn)
+
+      : [structName]"m"(below2G->name),
+        [answerArea]"m"(below2G->answerArea),
+        [answerAreaLen]"m"(below2G->answerAreaLength),
+        [plist]"m"(below2G->plist)
+
+      : "r0", "r1", "r14", "r15"
+
+  );
+
+  int rc = below2G->rc;
+  *rsn = below2G->rsn;
+
+  FREE_STRUCT31(
+    STRUCT31_NAME(below2G)
+  );
+
+  return rc;
+}
+
 int logstreamDefineCFLogstream(const LogstreamName *streamName,
                                const LogstreamStructName *structName,
                                const LogstreamDescription *description,
@@ -164,6 +216,57 @@ int logstreamDefineCFLogstream(const LogstreamName *streamName,
   return rc;
 }
 
+int logstreamDeleteLogstream(const LogstreamName *name, int *rsn) {
+
+  ALLOC_STRUCT31(
+    STRUCT31_NAME(below2G),
+    STRUCT31_FIELDS(
+      LogstreamName name;
+      char answerArea[40]; /* IXGANSAA  */
+      unsigned int answerAreaLength;
+      char plist[512];
+      int rc;
+      int rsn;
+    )
+  );
+
+
+  below2G->name = *name;
+  below2G->answerAreaLength = sizeof(below2G->answerArea);
+
+  __asm(
+
+      ASM_PREFIX
+      "         IXGINVNT REQUEST=DELETE"
+      ",TYPE=LOGSTREAM"
+      ",STREAMNAME=%[streamName]"
+      ",ANSAREA=%[answerArea]"
+      ",ANSLEN=%[answerAreaLen]"
+      ",RETCODE=%[rc]"
+      ",RSNCODE=%[rsn]"
+      ",MF=(E,%[plist],COMPLETE)"
+      "                                                                        \n"
+
+      : [rc]"=m"(below2G->rc), [rsn]"=m"(below2G->rsn)
+
+      : [streamName]"m"(below2G->name),
+        [answerArea]"m"(below2G->answerArea),
+        [answerAreaLen]"m"(below2G->answerAreaLength),
+        [plist]"m"(below2G->plist)
+
+      : "r0", "r1", "r14", "r15"
+
+  );
+
+  int rc = below2G->rc;
+  *rsn = below2G->rsn;
+
+  FREE_STRUCT31(
+    STRUCT31_NAME(below2G)
+  );
+
+  return rc;
+}
 
 int logstreamConntect(const LogstreamName *streamName,
                       bool readOnly,
@@ -655,35 +758,39 @@ int logstreamReadCursor(const LogstreamToken *streamToken,
 
 int main() {
 
-//  LogstreamStructName structName = {"IREK            "};
   int rc = 0, rsn = 0;
-//  rc = logstreamDefineStruct(&structName, 2, 4096, 1024, &rsn);
-//
-//  printf("define struct rc = %d, rsn = 0x%08X\n", rc, rsn);
-//
-//  LogstreamName streamName = {"TEST.STREAM               "};
-//  LogstreamDescription description = {"THIS_IS_A_TEST  "};
-//  rc = logstreamDefineCFLogstream(&streamName, &structName, &description, &rsn);
-//
-//  printf("define stream rc = %d, rsn = 0x%08X\n", rc, rsn);
 
-  LogstreamName streamName = {"SYSPLEX.OPERLOG           "};
+  LogstreamStructName structName = {"IREK            "};
+  LogstreamName streamName = {"TEST.STREAM               "};
+
+//  rc = logstreamDeleteLogstream(&streamName, &rsn);
+//  printf("delete stream rc = %d, rsn = 0x%08X\n", rc, rsn);
+//
+//  rc = logstreamDeleteStruct(&structName, &rsn);
+//  printf("delete struct rc = %d, rsn = 0x%08X\n", rc, rsn);
+//
+//  return 0;
+
+  rc = logstreamDefineStruct(&structName, 2, 4096, 1024, &rsn);
+  printf("define struct rc = %d, rsn = 0x%08X\n", rc, rsn);
+
+  LogstreamDescription description = {"THIS_IS_A_TEST  "};
+  rc = logstreamDefineCFLogstream(&streamName, &structName, &description, &rsn);
+  printf("define stream rc = %d, rsn = 0x%08X\n", rc, rsn);
+
   LogstreamToken token = {0};
   rc = logstreamConntect(&streamName, false, &token, &rsn);
-
   printf("token:\n");
   dumpbuffer((char *)&token, sizeof(token));
   printf("connect rc = %d, rsn = 0x%08X\n", rc, rsn);
 
   LogstreamBrowseToken browseToken = {0};
   rc = logstreamBrowseStart(&token, false, NULL, &browseToken, &rsn);
-
   printf("browse token:\n");
   dumpbuffer((char *)&browseToken, sizeof(browseToken));
   printf("disconnect rc = %d, rsn = 0x%08X\n", rc, rsn);
 
   rc = logstreamBrowseReset(&token, &browseToken, true, NULL, &rsn);
-
   printf("browse token:\n");
   dumpbuffer((char *)&browseToken, sizeof(browseToken));
   printf("disconnect rc = %d, rsn = 0x%08X\n", rc, rsn);
