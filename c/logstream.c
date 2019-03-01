@@ -38,7 +38,6 @@ int logstreamDefineStruct(const LogstreamStructName *name,
                           unsigned short averageBlockSize,
                           int *rsn) {
 
-
   ALLOC_STRUCT31(
     STRUCT31_NAME(below2G),
     STRUCT31_FIELDS(
@@ -106,7 +105,6 @@ int logstreamDefineCFLogstream(const LogstreamName *streamName,
                                const LogstreamDescription *description,
                                int *rsn) {
 
-
   ALLOC_STRUCT31(
     STRUCT31_NAME(below2G),
     STRUCT31_FIELDS(
@@ -172,7 +170,6 @@ int logstreamConntect(const LogstreamName *streamName,
                       LogstreamToken *token,
                       int *rsn) {
 
-
   ALLOC_STRUCT31(
     STRUCT31_NAME(below2G),
     STRUCT31_FIELDS(
@@ -201,7 +198,7 @@ int logstreamConntect(const LogstreamName *streamName,
       ",MF=(M,%[plist],COMPLETE)"
       "                                                                        \n"
 
-      : [rc]"=m"(below2G->rc), [rsn]"=m"(below2G->rsn)
+      :
 
       : [streamName]"m"(below2G->streamName),
         [answerArea]"m"(below2G->answerArea),
@@ -266,6 +263,58 @@ int logstreamConntect(const LogstreamName *streamName,
 }
 
 
+int logstreamDisconntect(const LogstreamToken *token, int *rsn) {
+
+  ALLOC_STRUCT31(
+    STRUCT31_NAME(below2G),
+    STRUCT31_FIELDS(
+      LogstreamToken token;
+      char answerArea[40]; /* IXGANSAA  */
+      unsigned int answerAreaLength;
+      char plist[512];
+      int rc;
+      int rsn;
+    )
+  );
+
+
+  below2G->token = *token;
+  below2G->answerAreaLength = sizeof(below2G->answerArea);
+
+  __asm(
+
+      ASM_PREFIX
+      "         IXGCONN REQUEST=DISCONNECT"
+      ",STREAMTOKEN=%[token]"
+      ",ANSAREA=%[answerArea]"
+      ",ANSLEN=%[answerAreaLen]"
+      ",RETCODE=%[rc]"
+      ",RSNCODE=%[rsn]"
+      ",MF=(E,%[plist],COMPLETE)"
+      "                                                                        \n"
+
+      : [rc]"=m"(below2G->rc), [rsn]"=m"(below2G->rsn)
+
+      : [token]"m"(below2G->token),
+        [answerArea]"m"(below2G->answerArea),
+        [answerAreaLen]"m"(below2G->answerAreaLength),
+        [plist]"m"(below2G->plist)
+
+      : "r0", "r1", "r14", "r15"
+
+  );
+
+  int rc = below2G->rc;
+  *rsn = below2G->rsn;
+
+  FREE_STRUCT31(
+    STRUCT31_NAME(below2G)
+  );
+
+  return rc;
+}
+
+
 int main() {
 
 //  LogstreamStructName structName = {"IREK            "};
@@ -287,6 +336,9 @@ int main() {
   printf("token:\n");
   dumpbuffer((char *)&token, sizeof(token));
   printf("connect rc = %d, rsn = 0x%08X\n", rc, rsn);
+
+  rc = logstreamDisconntect(&token, &rsn);
+  printf("disconnect rc = %d, rsn = 0x%08X\n", rc, rsn);
 
   return 0;
 }
