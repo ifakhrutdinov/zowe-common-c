@@ -29,7 +29,11 @@ typedef struct LogstreamToken_tag {
   char value[16];
 } LogstreamToken;
 
+typedef struct LogstreamBrowseToken_tag {
+  char value[4];
+} LogstreamBrowseToken;
 
+typedef int LogstreamECB;
 
 #endif /* H_LOGSTREAM_H_ */
 

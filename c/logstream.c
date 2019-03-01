@@ -210,13 +210,7 @@ int logstreamConntect(const LogstreamName *streamName,
   );
 
   /* Modify parameters. */
-  if (readOnly) {
-    __asm(
-        ASM_PREFIX
-        "         IXGCONN REQUEST=CONNECT,AUTH=READ,MF=(M,%[plist],NOCHECK)"
-        : : [plist]"m"(below2G->plist) : "r0", "r1", "r14", "r15"
-    );
-  } else {
+  if (!readOnly) {
     __asm(
         ASM_PREFIX
         "         IXGCONN REQUEST=CONNECT,AUTH=WRITE,MF=(M,%[plist],NOCHECK)"
@@ -315,6 +309,103 @@ int logstreamDisconntect(const LogstreamToken *token, int *rsn) {
 }
 
 
+int logstreamStartReading(const LogstreamToken *streamToken,
+                          bool fromYoungest,
+                          LogstreamECB * __ptr32 completionECB,
+                          LogstreamBrowseToken *browseToken,
+                          int *rsn) {
+
+  ALLOC_STRUCT31(
+    STRUCT31_NAME(below2G),
+    STRUCT31_FIELDS(
+      LogstreamToken streamToken;
+      LogstreamBrowseToken browseToken;
+      char answerArea[40]; /* IXGANSAA  */
+      unsigned int answerAreaLength;
+      char plist[512];
+      int rc;
+      int rsn;
+    )
+  );
+
+
+  below2G->streamToken = *streamToken;
+  below2G->answerAreaLength = sizeof(below2G->answerArea);
+
+  /* Init required parameters. */
+  __asm(
+
+      ASM_PREFIX
+      "         IXGBRWSE REQUEST=START"
+      ",STREAMTOKEN=%[streamToken]"
+      ",BROWSETOKEN=%[browseToken]"
+      ",ANSAREA=%[answerArea]"
+      ",ANSLEN=%[answerAreaLen]"
+      ",MF=(M,%[plist],COMPLETE)"
+      "                                                                        \n"
+
+      :
+
+      : [streamToken]"m"(below2G->streamToken),
+        [browseToken]"m"(below2G->browseToken),
+        [answerArea]"m"(below2G->answerArea),
+        [answerAreaLen]"m"(below2G->answerAreaLength),
+        [plist]"m"(below2G->plist)
+
+      : "r0", "r1", "r14", "r15"
+
+  );
+
+  /* Modify parameters. */
+  if (fromYoungest) {
+    __asm(
+        ASM_PREFIX
+        "         IXGBRWSE REQUEST=START,YOUNGEST,MF=(M,%[plist],NOCHECK)"
+        : : [plist]"m"(below2G->plist) : "r0", "r1", "r14", "r15"
+    );
+  }
+
+  if (completionECB != NULL) {
+    __asm(
+        ASM_PREFIX
+        "         IXGBRWSE REQUEST=START,MODE=SYNCECB,ECB=(%[ecb])"
+        ",MF=(M,%[plist],NOCHECK)"
+        :
+        : [ecb]"r"(completionECB), [plist]"m"(below2G->plist)
+        : "r0", "r1", "r14", "r15"
+    );
+  }
+
+  /* Execute request. */
+  __asm(
+
+      ASM_PREFIX
+      "         IXGBRWSE REQUEST=START"
+      ",RETCODE=%[rc]"
+      ",RSNCODE=%[rsn]"
+      ",MF=(E,%[plist],NOCHECK)"
+      "                                                                        \n"
+
+      : [rc]"=m"(below2G->rc), [rsn]"=m"(below2G->rsn)
+
+      : [plist]"m"(below2G->plist)
+
+      : "r0", "r1", "r14", "r15"
+
+  );
+
+  *browseToken = below2G->browseToken;
+  int rc = below2G->rc;
+  *rsn = below2G->rsn;
+
+  FREE_STRUCT31(
+    STRUCT31_NAME(below2G)
+  );
+
+  return rc;
+}
+
+
 int main() {
 
 //  LogstreamStructName structName = {"IREK            "};
@@ -336,6 +427,13 @@ int main() {
   printf("token:\n");
   dumpbuffer((char *)&token, sizeof(token));
   printf("connect rc = %d, rsn = 0x%08X\n", rc, rsn);
+
+  LogstreamBrowseToken browseToken = {0};
+  rc = logstreamStartReading(&token, false, NULL, &browseToken, &rsn);
+
+  printf("browse token:\n");
+  dumpbuffer((char *)&browseToken, sizeof(browseToken));
+  printf("disconnect rc = %d, rsn = 0x%08X\n", rc, rsn);
 
   rc = logstreamDisconntect(&token, &rsn);
   printf("disconnect rc = %d, rsn = 0x%08X\n", rc, rsn);
