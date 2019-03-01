@@ -26,7 +26,7 @@ typedef struct LogstreamDescription_tag {
 } LogstreamDescription;
 
 typedef struct LogstreamToken_tag {
-  char text[16];
+  char value[16];
 } LogstreamToken;
 
 

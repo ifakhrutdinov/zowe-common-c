@@ -10,13 +10,15 @@
   Copyright Contributors to the Zowe Project.
 */
 
-#include <metal/metal.h>
-#include <metal/stddef.h>
-#include <metal/stdio.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <string.h>
 
 #include "zowetypes.h"
 #include "alloc.h"
 #include "logstream.h"
+
+#include "utils.h"
 
 #ifndef __ZOWE_OS_ZOS
 #error z/OS targets are supported only
@@ -26,8 +28,7 @@
 
 xlc "-Wa,goff" \
 "-Wc,LANGLVL(EXTC99),FLOAT(HEX),agg,exp,list(),so(),goff,xref,gonum,roconst,gonum,ASM,ASMLIB('SYS1.MACLIB'),LP64,XPLINK" \
--DCMS_CLIENT -D_OPEN_THREADS=1  -I $COMMON/h -I ../h -o logstream logstream.c \
-alloc.c \
+-I ../h -o logstream logstream.c alloc.c utils.c timeutls.c
 
 */
 
@@ -165,19 +166,127 @@ int logstreamDefineCFLogstream(const LogstreamName *streamName,
   return rc;
 }
 
+
+int logstreamConntect(const LogstreamName *streamName,
+                      bool readOnly,
+                      LogstreamToken *token,
+                      int *rsn) {
+
+
+  ALLOC_STRUCT31(
+    STRUCT31_NAME(below2G),
+    STRUCT31_FIELDS(
+      LogstreamName streamName;
+      LogstreamToken token;
+      char answerArea[40]; /* IXGANSAA  */
+      unsigned int answerAreaLength;
+      char plist[512];
+      int rc;
+      int rsn;
+    )
+  );
+
+
+  below2G->streamName = *streamName;
+  below2G->answerAreaLength = sizeof(below2G->answerArea);
+
+  /* Init required parameters. */
+  __asm(
+
+      ASM_PREFIX
+      "         IXGCONN REQUEST=CONNECT"
+      ",STREAMNAME=%[streamName]"
+      ",ANSAREA=%[answerArea]"
+      ",ANSLEN=%[answerAreaLen]"
+      ",MF=(M,%[plist],COMPLETE)"
+      "                                                                        \n"
+
+      : [rc]"=m"(below2G->rc), [rsn]"=m"(below2G->rsn)
+
+      : [streamName]"m"(below2G->streamName),
+        [answerArea]"m"(below2G->answerArea),
+        [answerAreaLen]"m"(below2G->answerAreaLength),
+        [plist]"m"(below2G->plist)
+
+      : "r0", "r1", "r14", "r15"
+
+  );
+
+  /* Modify parameters. */
+  if (readOnly) {
+    __asm(
+        ASM_PREFIX
+        "         IXGCONN REQUEST=CONNECT,AUTH=READ,MF=(M,%[plist],NOCHECK)"
+        : : [plist]"m"(below2G->plist) : "r0", "r1", "r14", "r15"
+    );
+  } else {
+    __asm(
+        ASM_PREFIX
+        "         IXGCONN REQUEST=CONNECT,AUTH=WRITE,MF=(M,%[plist],NOCHECK)"
+        : : [plist]"m"(below2G->plist) : "r0", "r1", "r14", "r15"
+    );
+  }
+
+  /* Execute request. */
+  __asm(
+
+      ASM_PREFIX
+      "         IXGCONN REQUEST=CONNECT"
+      ",STREAMTOKEN=%[token]"
+      ",RETCODE=%[rc]"
+      ",RSNCODE=%[rsn]"
+      ",MF=(E,%[plist],NOCHECK)"
+      "                                                                        \n"
+
+      : [token]"=m"(below2G->token),
+        [rc]"=m"(below2G->rc), [rsn]"=m"(below2G->rsn)
+
+      : [plist]"m"(below2G->plist)
+
+      : "r0", "r1", "r14", "r15"
+
+  );
+
+  /* Sad... that's what the doc says:
+   * If you use IXGCONN REQUEST=CONNECT,...,MF=(E,parmlist,NOCHECK) with either
+   *  the STREAMTOKEN=xxxx or the USERDATA=yyyy keyword, the following
+   *  procedure must be followed. When the processing is complete, move the
+   *  STREAMTOKEN or USERDATA values from the parameter list specified on
+   *  MF= to your own storage.  */
+  memcpy(token->value, &below2G->plist[170], 16);
+
+  int rc = below2G->rc;
+  *rsn = below2G->rsn;
+
+  FREE_STRUCT31(
+    STRUCT31_NAME(below2G)
+  );
+
+  return rc;
+}
+
+
 int main() {
 
-  LogstreamStructName structName = {"IREK            "};
+//  LogstreamStructName structName = {"IREK            "};
   int rc = 0, rsn = 0;
-  rc = logstreamDefineStruct(&structName, 2, 4096, 1024, &rsn);
+//  rc = logstreamDefineStruct(&structName, 2, 4096, 1024, &rsn);
+//
+//  printf("define struct rc = %d, rsn = 0x%08X\n", rc, rsn);
+//
+//  LogstreamName streamName = {"TEST.STREAM               "};
+//  LogstreamDescription description = {"THIS_IS_A_TEST  "};
+//  rc = logstreamDefineCFLogstream(&streamName, &structName, &description, &rsn);
+//
+//  printf("define stream rc = %d, rsn = 0x%08X\n", rc, rsn);
 
-  printf("define struct rc = %d, rsn = 0x%08X\n", rc, rsn);
+  LogstreamName streamName = {"SYSPLEX.OPERLOG           "};
+  LogstreamToken token = {0};
+  rc = logstreamConntect(&streamName, false, &token, &rsn);
 
-  LogstreamName streamName = {"TEST.STREAM               "};
-  LogstreamDescription description = {"THIS_IS_A_TEST  "};
-  rc = logstreamDefineCFLogstream(&streamName, &structName, &description, &rsn);
-
-  printf("define stream rc = %d, rsn = 0x%08X\n", rc, rsn);
+  printf("token:\n");
+  dumpbuffer((char *)&token, sizeof(token));
+  printf("connect rc = %d, rsn = 0x%08X\n", rc, rsn);
 
   return 0;
 }
