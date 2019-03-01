@@ -17,6 +17,10 @@ typedef struct LogstreamStructName_tag {
   char text[16];
 } LogstreamStructName;
 
+typedef struct LogstreamHLQ_tag {
+  char name[8];
+} LogstreamHLQ;
+
 typedef struct LogstreamName_tag {
   char text[26];
 } LogstreamName;
