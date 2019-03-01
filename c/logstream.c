@@ -218,6 +218,7 @@ int logstreamDefineCFLogstream(const LogstreamName *streamName,
 
 int logstreamDefineDASDLogstream(const LogstreamName *streamName,
                                  const LogstreamHLQ *hlq,
+                                 unsigned int datasetSize,
                                  const LogstreamDescription *description,
                                  int *rsn) {
 
@@ -229,6 +230,7 @@ int logstreamDefineDASDLogstream(const LogstreamName *streamName,
       LogstreamDescription description;
       char answerArea[40]; /* IXGANSAA  */
       unsigned int answerAreaLength;
+      unsigned int stgSize;
       char plist[512];
       int rc;
       int rsn;
@@ -240,6 +242,7 @@ int logstreamDefineDASDLogstream(const LogstreamName *streamName,
   below2G->hlq = *hlq;
   below2G->description = *description;
   below2G->answerAreaLength = sizeof(below2G->answerArea);
+  below2G->stgSize = datasetSize;
 
   __asm(
 
@@ -248,6 +251,7 @@ int logstreamDefineDASDLogstream(const LogstreamName *streamName,
       ",TYPE=LOGSTREAM"
       ",STREAMNAME=%[streamName]"
       ",HLQ=%[hlq]"
+      ",STG_SIZE=%[stgSize]"
       ",DASDONLY=YES"
       ",DESCRIPTION=%[description]"
       ",ANSAREA=%[answerArea]"
@@ -261,6 +265,7 @@ int logstreamDefineDASDLogstream(const LogstreamName *streamName,
 
       : [streamName]"m"(below2G->streamName),
         [hlq]"m"(below2G->hlq),
+        [stgSize]"m"(below2G->stgSize),
         [description]"m"(below2G->description),
         [answerArea]"m"(below2G->answerArea),
         [answerAreaLen]"m"(below2G->answerAreaLength),
@@ -670,7 +675,7 @@ int logstreamBrowseReset(const LogstreamToken *streamToken,
   return rc;
 }
 
-static bool isAddr64(void *addr) {
+static bool isAddr64(const void *addr) {
 
   if (sizeof(addr) < 8) {
     return false;
@@ -820,6 +825,119 @@ int logstreamReadCursor(const LogstreamToken *streamToken,
   return rc;
 }
 
+int logstreamWrite(const LogstreamToken *streamToken,
+                   const void *data,
+                   unsigned int dataSize,
+                   LogstreamECB * __ptr32 completionECB,
+                   int *rsn) {
+
+  ALLOC_STRUCT31(
+    STRUCT31_NAME(below2G),
+    STRUCT31_FIELDS(
+      LogstreamToken streamToken;
+      unsigned int dataSize;
+      char answerArea[40]; /* IXGANSAA  */
+      unsigned int answerAreaLength;
+      char plist[512];
+      int rc;
+      int rsn;
+    )
+  );
+
+
+  below2G->streamToken = *streamToken;
+  below2G->dataSize = dataSize;
+  below2G->answerAreaLength = sizeof(below2G->answerArea);
+
+  /* Init required parameters. */
+  if (isAddr64(data)) {
+    __asm(
+
+        ASM_PREFIX
+        "         IXGWRITE STREAMTOKEN=%[streamToken]"
+        ",BUFFER64=(%[data])"
+        ",BLOCKLEN=%[dataSize]"
+        ",ANSAREA=%[answerArea]"
+        ",ANSLEN=%[answerAreaLen]"
+        ",MF=(M,%[plist],COMPLETE)"
+        "                                                                        \n"
+
+        :
+
+        : [streamToken]"m"(below2G->streamToken),
+          [data]"r"(data),
+          [dataSize]"m"(below2G->dataSize),
+          [answerArea]"m"(below2G->answerArea),
+          [answerAreaLen]"m"(below2G->answerAreaLength),
+          [plist]"m"(below2G->plist)
+
+        : "r0", "r1", "r14", "r15"
+
+    );
+  } else {
+    __asm(
+
+        ASM_PREFIX
+        "         IXGWRITE STREAMTOKEN=%[streamToken]"
+        ",BUFFER=(%[data])"
+        ",BLOCKLEN=%[dataSize]"
+        ",ANSAREA=%[answerArea]"
+        ",ANSLEN=%[answerAreaLen]"
+        ",MF=(M,%[plist],COMPLETE)"
+        "                                                                        \n"
+
+        :
+
+        : [streamToken]"m"(below2G->streamToken),
+          [data]"r"(data),
+          [dataSize]"m"(below2G->dataSize),
+          [answerArea]"m"(below2G->answerArea),
+          [answerAreaLen]"m"(below2G->answerAreaLength),
+          [plist]"m"(below2G->plist)
+
+        : "r0", "r1", "r14", "r15"
+
+    );
+  }
+
+  /* Modify parameters. */
+  if (completionECB != NULL) {
+    __asm(
+        ASM_PREFIX
+        "         IXGWRITE MODE=SYNCECB,ECB=(%[ecb])"
+        ",MF=(M,%[plist],NOCHECK)"
+        :
+        : [ecb]"r"(completionECB), [plist]"m"(below2G->plist)
+        : "r0", "r1", "r14", "r15"
+    );
+  }
+
+  /* Execute request. */
+  __asm(
+
+      ASM_PREFIX
+      "         IXGWRITE RETCODE=%[rc],RSNCODE=%[rsn]"
+      ",MF=(E,%[plist],NOCHECK)"
+      "                                                                        \n"
+
+      : [rc]"=m"(below2G->rc), [rsn]"=m"(below2G->rsn)
+
+      : [plist]"m"(below2G->plist)
+
+      : "r0", "r1", "r14", "r15"
+
+  );
+
+  int rc = below2G->rc;
+  *rsn = below2G->rsn;
+
+  FREE_STRUCT31(
+    STRUCT31_NAME(below2G)
+  );
+
+  return rc;
+}
+
 int main() {
 
   int rc = 0, rsn = 0;
@@ -827,9 +945,9 @@ int main() {
   LogstreamStructName structName = {"ZIS_TEST_STRUCT "};
   LogstreamName streamName = {"ZIS.TEST.STREAM           "};
 
-//  rc = logstreamDeleteLogstream(&streamName, &rsn);
-//  printf("delete stream rc = %d, rsn = 0x%08X\n", rc, rsn);
-//
+  rc = logstreamDeleteLogstream(&streamName, &rsn);
+  printf("delete stream rc = %d, rsn = 0x%08X\n", rc, rsn);
+
 //  rc = logstreamDeleteStruct(&structName, &rsn);
 //  printf("delete struct rc = %d, rsn = 0x%08X\n", rc, rsn);
 //
@@ -840,7 +958,7 @@ int main() {
 
   LogstreamDescription description = {"THIS_IS_A_TEST  "};
   LogstreamHLQ hlq = {"SSUSER1 "};
-  rc = logstreamDefineDASDLogstream(&streamName, &hlq, &description, &rsn);
+  rc = logstreamDefineDASDLogstream(&streamName, &hlq, 50, &description, &rsn);
   printf("define stream rc = %d, rsn = 0x%08X\n", rc, rsn);
 
   LogstreamToken token = {0};
@@ -848,6 +966,12 @@ int main() {
   printf("token:\n");
   dumpbuffer((char *)&token, sizeof(token));
   printf("connect rc = %d, rsn = 0x%08X\n", rc, rsn);
+
+  const char *messages[] = {"hello", "this is a log stream test", "bye"};
+  for (int i = 0; i < sizeof(messages) / sizeof(messages[0]); i++) {
+    rc = logstreamWrite(&token, messages[i], strlen(messages[i]), NULL, &rsn);
+    printf("write rc = %d, rsn = 0x%08X\n", rc, rsn);
+  }
 
   LogstreamBrowseToken browseToken = {0};
   rc = logstreamBrowseStart(&token, false, NULL, &browseToken, &rsn);
