@@ -130,7 +130,8 @@
 #define RC_CMS_NO_STEPLIB                   81
 #define RC_CMS_MODULE_NOT_IN_STEPLIB        82
 #define RC_CMS_ZVT_NOT_ALLOCATED            83
-#define RC_CMS_MAX_RC                       83
+#define RC_CMS_SERVICE_ENTRY_OCCUPIED       84
+#define RC_CMS_MAX_RC                       84
 
 extern const char *CMS_RC_DESCRIPTION[];
 
@@ -803,6 +804,12 @@ CrossMemoryServerName cmsMakeServerName(const char *nameNullTerm);
 #endif
 #define CMS_LOG_STEP_ABEND_MSG_TEXT             "ABEND S%03X-%02X averted in step '%s' (recovery RC = %d)"
 #define CMS_LOG_STEP_ABEND_MSG                  CMS_LOG_STEP_ABEND_MSG_ID" "CMS_LOG_STEP_ABEND_MSG_TEXT
+
+#ifndef CMS_LOG_SRVC_ENTRY_OCCUPIED_MSG_ID
+#define CMS_LOG_SRVC_ENTRY_OCCUPIED_MSG_ID      CMS_MSG_PRFX"0246E"
+#endif
+#define CMS_LOG_SRVC_ENTRY_OCCUPIED_MSG_TEXT    "Service entry %d is occupied"
+#define CMS_LOG_SRVC_ENTRY_OCCUPIED_MSG         CMS_LOG_SRVC_ENTRY_OCCUPIED_MSG_ID" "CMS_LOG_SRVC_ENTRY_OCCUPIED_MSG_TEXT
 
 #endif /* H_CROSSMEMORY_H_ */
 
