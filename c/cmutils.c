@@ -382,7 +382,6 @@ static CPID cellpoolBuild(unsigned int pCellCount,
                           const CPHeader *header) {
 
   CPID cpid = -1;
-  key <<= 4;
 
   ALLOC_STRUCT31(
     STRUCT31_NAME(below2G),
@@ -413,10 +412,11 @@ static CPID cellpoolBuild(unsigned int pCellCount,
       ",SCELLCT=(%[scell])"
       ",CSIZE=(%[csize])"
       ",SP=(%[sp])"
+      ",KEY=(%[key])"
       ",LOC=(31,64)"
       ",CPID=(%[cpid])"
-      ",HDR=(%[header])"
-      ",MF=(E,(%[parmList]))"
+      ",HDR=%[header]"
+      ",MF=(E,%[parmList])"
       "                                                                        \n"
 
 #ifdef _LP64
@@ -426,8 +426,8 @@ static CPID cellpoolBuild(unsigned int pCellCount,
 
       : [cpid]"=NR:r0"(cpid)
       : [pcell]"r"(pCellCount), [scell]"r"(sCellCount), [csize]"r"(cellSize),
-        [sp]"r"(subpool), [key]"r"(key), [header]"r"(&below2G->header),
-        [parmList]"r"(&below2G->parmList)
+        [sp]"r"(subpool), [key]"r"(key), [header]"m"(below2G->header),
+        [parmList]"m"(below2G->parmList)
       : "r0", "r1", "r14", "r15"
   );
 
