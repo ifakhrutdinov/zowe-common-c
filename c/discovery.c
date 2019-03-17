@@ -546,6 +546,19 @@ int findSessions(DiscoveryContext *context,
                  int               sessionKeyType,
                  int               numericKeyValue,
                  char             *stringKeyValue){
+
+  return findSessions2(context, sessionKeyType, numericKeyValue, stringKeyValue,
+                       NULL, NULL);
+
+}
+
+int findSessions2(DiscoveryContext *context,
+                  int               sessionKeyType,
+                  int               numericKeyValue,
+                  char             *stringKeyValue,
+                  TN3270Visitor    *tn3270Visitor,
+                  void             *visitorData) {
+
   int bufferLength = NMIBUFSIZE;
   int attempts     = 0;
 
@@ -701,9 +714,11 @@ int findSessions(DiscoveryContext *context,
         zowelog(NULL, LOG_COMP_DISCOVERY, ZOWE_LOG_DEBUG, "fitlering=%d connProto=%d\n",filtering,cnxn->NWMConnProto);
         if (!filtering && ((cnxn->NWMConnProto == NWMConnPROTO_TN3270E) ||
                            (cnxn->NWMConnProto == NWMConnPROTO_TN3270))){
+
+          TN3270Info *info = NULL;
           if (isTSOAppl(&cnxn->NWMConnTargetAppl[0])){
             zowelog(NULL, LOG_COMP_DISCOVERY, ZOWE_LOG_DEBUG, "SESSION IS: TSO/ISPF\n");
-            TN3270Info *info = addTN3270Info(context,cnxn,TN3270_IS_TSO|v6FlagValue,addressAsString);
+            info = addTN3270Info(context,cnxn,TN3270_IS_TSO|v6FlagValue,addressAsString);
             TSBInfo *tsbInfo = htGet(tsbTable,cnxn->NWMConnLuName);
             if (tsbInfo){
               ASCB *ascb = tsbInfo->ascb;
@@ -717,8 +732,13 @@ int findSessions(DiscoveryContext *context,
             }
           } else{
             zowelog(NULL, LOG_COMP_DISCOVERY, ZOWE_LOG_DEBUG, "SESSION IS: OMEGAMON or some other VTAM APPL\n");
-            TN3270Info *info = addTN3270Info(context,cnxn,v6FlagValue,addressAsString);
+            info = addTN3270Info(context,cnxn,v6FlagValue,addressAsString);
           }
+
+          if (tn3270Visitor) {
+            tn3270Visitor(context, info, cnxn, visitorData);
+          }
+
         }
         dataElement += elementLength;
         
@@ -726,6 +746,8 @@ int findSessions(DiscoveryContext *context,
       break;   /* if we ever get a good result, leave the while loop */
     }
   }
+
+  return 0;
 }
 
 /************************** ZOS Model Maintenance ********************************/
@@ -860,6 +882,10 @@ static void scanSlowSoftware(ZOSModel *model){
   model->wasSubsystems = context->wasSubsystems;
   model->softwareInstances = context->softwareInstances;
 
+  if (model->slowSoftwareHook) {
+    model->slowSoftwareHook(context, model->visitorsData);
+  }
+
   if (oldInstanceList){
     /* kill off the detailSLH of each */
   }
@@ -908,6 +934,18 @@ ZOSModel *makeZOSModel2(CrossMemoryServerName *privilegedServerName,
                         SubsystemVisitor *subsystemVisitor,
                         StartedTaskVisitor *stcVisitor,
                         void *visitorsData) {
+
+  return makeZOSModel3(privilegedServerName, subsystemVisitor, stcVisitor, NULL,
+                       visitorsData);
+
+}
+
+ZOSModel *makeZOSModel3(CrossMemoryServerName *privilegedServerName,
+                        SubsystemVisitor *subsystemVisitor,
+                        StartedTaskVisitor *stcVisitor,
+                        SlowSoftwareHook *slowSoftwareHook,
+                        void *visitorsData) {
+
   ZOSModel *model = (ZOSModel*)safeMalloc(sizeof(ZOSModel),"ZOSModel");
   memset(model,0,sizeof(ZOSModel));
 
@@ -920,6 +958,7 @@ ZOSModel *makeZOSModel2(CrossMemoryServerName *privilegedServerName,
 
   model->subsystemVisitor = subsystemVisitor;
   model->startedTaskVisitor = stcVisitor;
+  model->slowSoftwareHook = slowSoftwareHook;
   model->visitorsData = visitorsData;
 
   return model;

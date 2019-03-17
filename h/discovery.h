@@ -14,6 +14,7 @@
 #define __ZOWE_DISCOVERY__ 1
 
 #include "crossmemory.h"
+#include "ezbnmrhc.h"
 
 #pragma pack(packed)
 
@@ -176,6 +177,9 @@ typedef void StartedTaskVisitor(struct DiscoveryContext_tag *context,
                                 ASCB *stcASCB,
                                 void *visitorData);
 
+typedef void SlowSoftwareHook(struct DiscoveryContext_tag *context,
+                              void *visitorData);
+
 typedef struct ZOSModel_tag {
   uint64             slowScanExpiry;
   uint64             lastSlowScan;
@@ -195,6 +199,7 @@ typedef struct ZOSModel_tag {
   
   SubsystemVisitor  *subsystemVisitor;
   StartedTaskVisitor*startedTaskVisitor;
+  SlowSoftwareHook  *slowSoftwareHook;
   void *visitorsData;
 
   CrossMemoryServerName privilegedServerName;
@@ -228,6 +233,11 @@ ZOSModel *makeZOSModel2(CrossMemoryServerName *privilegedServerName,
                         SubsystemVisitor *subsystemVisitor,
                         StartedTaskVisitor *stcVisitor,
                         void *visitorsData);
+ZOSModel *makeZOSModel3(CrossMemoryServerName *privilegedServerName,
+                        SubsystemVisitor *subsystemVisitor,
+                        StartedTaskVisitor *stcVisitor,
+                        SlowSoftwareHook *slowSoftwareHook,
+                        void *visitorsData);
 
 /* The model argument allows a discovery context of faster moving data to find data relative to slower moving
    data to reduce resource consumption.
@@ -247,11 +257,20 @@ hashtable *zModelGetTSBs(ZOSModel *model);
 #define SESSION_KEY_TYPE_IP4_STRING  4
 #define SESSION_KEY_TYPE_IP6_STRING  5
 
+typedef void (TN3270Visitor)(DiscoveryContext *cntx, TN3270Info *tn3270Info,
+                             NWMConnEntry *connEntry, void *userData);
+
 int findSessions(DiscoveryContext *context,
                  int               sessionKeyType,
                  int               numericKeyValue,
                  char             *stringKeyValue);
 
+int findSessions2(DiscoveryContext *context,
+                  int               sessionKeyType,
+                  int               numericKeyValue,
+                  char             *stringKeyValue,
+                  TN3270Visitor    *entryVisitor,
+                  void             *visitorData);
 
 char *getSoftwareTypeName(TN3270Info *info);
 char *getSoftwareSubtypeName(TN3270Info *info);
