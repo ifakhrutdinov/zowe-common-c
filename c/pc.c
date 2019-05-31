@@ -91,7 +91,7 @@ static int reserveLinkageIndex(PCLinkageIndexList * __ptr32 indexList,
 #define LXRES_OPT_SIZE_16   0x20
 #define LXRES_OPT_SIZE_23   0x10
 #define LXRES_OPT_SIZE_24   0x08
-#define LXRES_OPT_NO_EXLIST 0x04
+#define LXRES_OPT_EXLIST    0x04
 #define LXRES_OPT_RESERVED1 0x02
 #define LXRES_OPT_RESERVED2 0x01
     char reserved[2];
@@ -129,6 +129,7 @@ static int reserveLinkageIndex(PCLinkageIndexList * __ptr32 indexList,
     break;
   }
 
+  below2G->parmList.optionByte |= LXRES_OPT_EXLIST;
   below2G->parmList.elxList = indexList;
 
   int lxresRC = 0;
@@ -171,8 +172,8 @@ static int freeLinkageIndex(PCLinkageIndexList * __ptr32 indexList,
   typedef struct LXFREParmList_tag {
     uint8_t formatByte;
     uint8_t optionByte;
-#define LXFRE_OPT_NO_FORCE  0x80
-#define LXFRE_OPT_NO_EXLIST 0x40
+#define LXFRE_OPT_FORCE   0x80
+#define LXFRE_OPT_EXLIST  0x40
     char reserved[2];
     PCLinkageIndexList * __ptr32 elxList;
   } LXFREParmList;
@@ -185,7 +186,7 @@ static int freeLinkageIndex(PCLinkageIndexList * __ptr32 indexList,
   );
 
   if (forced) {
-    below2G->parmList.optionByte |= LXFRE_OPT_NO_FORCE;
+    below2G->parmList.optionByte |= LXFRE_OPT_FORCE;
   }
 
   below2G->parmList.elxList = indexList;
@@ -346,7 +347,7 @@ EntryTableDescriptor *pcMakeEntryTableDescriptor(void) {
 
 
 int pcAddToEntryTableDescriptor(EntryTableDescriptor *descriptor,
-                                void * __ptr32 routine,
+                                int (* __ptr32 routine)(void),
                                 uint32_t routineParameter1,
                                 uint32_t routineParameter2,
                                 bool isSASNOld,
@@ -443,7 +444,7 @@ int pcDestroyEntryTable(PCEntryTableToken token, bool purge, int *reasonCode) {
   typedef struct ETDESParmList_tag {
     uint8_t formatByte;
     uint8_t optionByte;
-  #define ETDES_OPT_NO_PURGE  0x80
+  #define ETDES_OPT_PURGE   0x80
     char reserved[2];
     PCEntryTableToken * __ptr32 token;
   } ETDESParmList;
@@ -455,8 +456,8 @@ int pcDestroyEntryTable(PCEntryTableToken token, bool purge, int *reasonCode) {
     )
   );
 
-  if (!purge) {
-    below2G->parmList.optionByte |= ETDES_OPT_NO_PURGE;
+  if (purge) {
+    below2G->parmList.optionByte |= ETDES_OPT_PURGE;
   }
 
   below2G->parmList.token = &token;

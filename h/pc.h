@@ -70,7 +70,7 @@ int pcFreeLinkageIndex(PCLinkageIndex index, bool forced, int *reasonCode);
 
 EntryTableDescriptor *pcMakeEntryTableDescriptor(void);
 int pcAddToEntryTableDescriptor(EntryTableDescriptor *descriptor,
-                                void * __ptr32 routine,
+                                int (* __ptr32 routine)(void),
                                 uint32_t routineParameter1,
                                 uint32_t routineParameter2,
                                 bool isSASNOld,
