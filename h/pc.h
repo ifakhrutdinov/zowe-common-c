@@ -24,6 +24,11 @@
 
 ZOWE_PRAGMA_PACK
 
+typedef struct PCLatentParmList_tag {
+  void * __ptr32 parm1;
+  void * __ptr32 parm2;
+} PCLatentParmList;
+
 typedef struct PCLinkageIndex {
   int sequenceNumber;
   int pcNumber;
@@ -55,31 +60,44 @@ typedef uint32_t PCEntryTableToken;
 
 typedef struct ETD_tag EntryTableDescriptor;
 
-int pcSetAllAddressSpaceAuthority(void);
+int pcSetAllAddressSpaceAuthority(int *reasonCode);
 
 int pcReserveLinkageIndex(bool isSystem, bool isReusable,
                           PCLinkageIndexSize indexSize,
-                          PCLinkageIndex *result);
-int pcFreeLinkageIndex(PCLinkageIndex index, bool forced);
+                          PCLinkageIndex *result,
+                          int *reasonCode);
+int pcFreeLinkageIndex(PCLinkageIndex index, bool forced, int *reasonCode);
 
 EntryTableDescriptor *pcMakeEntryTableDescriptor(void);
-void pcAddToEntryTableDescriptor(EntryTableDescriptor *descriptor,
-                                 void * __ptr32 routine,
-                                 uint32_t routineParameter1,
-                                 uint32_t routineParameter2,
-                                 bool isSASNOld,
-                                 bool isAMODE64,
-                                 bool isSUP,
-                                 bool isSpaceSwitch,
-                                 int key);
+int pcAddToEntryTableDescriptor(EntryTableDescriptor *descriptor,
+                                void * __ptr32 routine,
+                                uint32_t routineParameter1,
+                                uint32_t routineParameter2,
+                                bool isSASNOld,
+                                bool isAMODE64,
+                                bool isSUP,
+                                bool isSpaceSwitch,
+                                int key);
 void pcRemoveEntryTableDescriptor(EntryTableDescriptor *descriptor);
 
 int pcCreateEntryTable(const EntryTableDescriptor *descriptor,
-                       PCEntryTableToken *resultToken);
-int pcDestroyEntryTable(PCEntryTableToken token, bool purge);
+                       PCEntryTableToken *resultToken,
+                       int *reasonCode);
+int pcDestroyEntryTable(PCEntryTableToken token, bool purge, int *reasonCode);
 
-int pcConnectEntryTable(PCEntryTableToken token, PCLinkageIndex index);
-int pcDisconnectEntryTable(PCEntryTableToken token);
+int pcConnectEntryTable(PCEntryTableToken token, PCLinkageIndex index,
+                        int *reasonCode);
+int pcDisconnectEntryTable(PCEntryTableToken token, int *reasonCode);
+
+#define RC_PC_OK            0
+#define RC_PC_AXSET_FAILED  8
+#define RC_PC_LXRES_FAILED  9
+#define RC_PC_LXFRE_FAILED  10
+#define RC_PC_ETD_FULL      11
+#define RC_PC_ETCRE_FAILED  12
+#define RC_PC_ETDES_FAILED  13
+#define RC_PC_ETCON_FAILED  14
+#define RC_PC_ETDIS_FAILED  15
 
 #endif /* H_PC_H_ */
 

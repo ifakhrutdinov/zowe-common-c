@@ -26,7 +26,7 @@
 #include "pc.h"
 
 
-int pcSetAllAddressSpaceAuthority(void) {
+int pcSetAllAddressSpaceAuthority(int *reasonCode) {
 
   int axsetRC = 0;
   __asm(
@@ -55,7 +55,12 @@ int pcSetAllAddressSpaceAuthority(void) {
       : "r0", "r1", "r14", "r15"
   );
 
-  return axsetRC;
+  if (axsetRC != 0) {
+    *reasonCode = axsetRC;
+    return RC_PC_AXSET_FAILED;
+  }
+
+  return RC_PC_OK;
 }
 
 
@@ -219,7 +224,8 @@ static int freeLinkageIndex(PCLinkageIndexList * __ptr32 indexList,
 
 int pcReserveLinkageIndex(bool isSystem, bool isReusable,
                           PCLinkageIndexSize indexSize,
-                          PCLinkageIndex *result) {
+                          PCLinkageIndex *result,
+                          int *reasonCode) {
 
   ALLOC_STRUCT31(
     STRUCT31_NAME(below2G),
@@ -239,11 +245,16 @@ int pcReserveLinkageIndex(bool isSystem, bool isReusable,
     STRUCT31_NAME(below2G)
   );
 
-  return rc;
+  if (rc != 0) {
+    *reasonCode = rc;
+    return RC_PC_LXRES_FAILED;
+  }
+
+  return RC_PC_OK;
 }
 
 
-int pcFreeLinkageIndex(PCLinkageIndex index, bool forced) {
+int pcFreeLinkageIndex(PCLinkageIndex index, bool forced, int *reasonCode) {
 
   ALLOC_STRUCT31(
     STRUCT31_NAME(below2G),
@@ -261,7 +272,12 @@ int pcFreeLinkageIndex(PCLinkageIndex index, bool forced) {
     STRUCT31_NAME(below2G)
   );
 
-  return rc;
+  if (rc != 0) {
+    *reasonCode = rc;
+    return RC_PC_LXFRE_FAILED;
+  }
+
+  return RC_PC_OK;
 }
 
 ZOWE_PRAGMA_PACK
@@ -329,18 +345,18 @@ EntryTableDescriptor *pcMakeEntryTableDescriptor(void) {
 }
 
 
-void pcAddToEntryTableDescriptor(EntryTableDescriptor *descriptor,
-                                 void * __ptr32 routine,
-                                 uint32_t routineParameter1,
-                                 uint32_t routineParameter2,
-                                 bool isSASNOld,
-                                 bool isAMODE64,
-                                 bool isSUP,
-                                 bool isSpaceSwitch,
-                                 int key) {
+int pcAddToEntryTableDescriptor(EntryTableDescriptor *descriptor,
+                                void * __ptr32 routine,
+                                uint32_t routineParameter1,
+                                uint32_t routineParameter2,
+                                bool isSASNOld,
+                                bool isAMODE64,
+                                bool isSUP,
+                                bool isSpaceSwitch,
+                                int key) {
 
   if (descriptor->entryNumber == ETD_MAX_ENTRY_COUNT) {
-    return;
+    return RC_PC_ETD_FULL;
   }
 
   ETDELE *entry = &descriptor->entries[descriptor->entryNumber];
@@ -373,6 +389,7 @@ void pcAddToEntryTableDescriptor(EntryTableDescriptor *descriptor,
 
   descriptor->entryNumber++;
 
+  return RC_PC_OK;
 }
 
 
@@ -382,7 +399,8 @@ void pcRemoveEntryTableDescriptor(EntryTableDescriptor *descriptor) {
 
 
 int pcCreateEntryTable(const EntryTableDescriptor *descriptor,
-                       PCEntryTableToken *token) {
+                       PCEntryTableToken *token,
+                       int *reasonCode) {
 
   int etcreRC = 0;
   __asm(
@@ -411,11 +429,16 @@ int pcCreateEntryTable(const EntryTableDescriptor *descriptor,
       : "r0", "r1", "r14", "r15"
   );
 
-  return etcreRC;
+  if (etcreRC != 0) {
+    *reasonCode = etcreRC;
+    return RC_PC_ETCRE_FAILED;
+  }
+
+  return RC_PC_OK;
 }
 
 
-int pcDestroyEntryTable(PCEntryTableToken token, bool purge) {
+int pcDestroyEntryTable(PCEntryTableToken token, bool purge, int *reasonCode) {
 
   typedef struct ETDESParmList_tag {
     uint8_t formatByte;
@@ -468,7 +491,12 @@ int pcDestroyEntryTable(PCEntryTableToken token, bool purge) {
     STRUCT31_NAME(below2G)
   );
 
-  return etdesRC;
+  if (etdesRC != 0) {
+    *reasonCode = etdesRC;
+    return RC_PC_ETDES_FAILED;
+  }
+
+  return RC_PC_OK;
 }
 
 
@@ -560,7 +588,8 @@ static int disconnectEntryTable(PCEntryTableTokenList * __ptr32 tokenList) {
 }
 
 
-int pcConnectEntryTable(PCEntryTableToken token, PCLinkageIndex index) {
+int pcConnectEntryTable(PCEntryTableToken token, PCLinkageIndex index,
+                        int *reasonCode) {
 
   ALLOC_STRUCT31(
     STRUCT31_NAME(below2G),
@@ -582,10 +611,15 @@ int pcConnectEntryTable(PCEntryTableToken token, PCLinkageIndex index) {
     STRUCT31_NAME(below2G)
   );
 
-  return rc;
+  if (rc != 0) {
+    *reasonCode = rc;
+    return RC_PC_ETCON_FAILED;
+  }
+
+  return RC_PC_OK;
 }
 
-int pcDisconnectEntryTable(PCEntryTableToken token) {
+int pcDisconnectEntryTable(PCEntryTableToken token, int *reasonCode) {
 
   ALLOC_STRUCT31(
     STRUCT31_NAME(below2G),
@@ -603,7 +637,12 @@ int pcDisconnectEntryTable(PCEntryTableToken token) {
     STRUCT31_NAME(below2G)
   );
 
-  return rc;
+  if (rc != 0) {
+    *reasonCode = rc;
+    return RC_PC_ETDIS_FAILED;
+  }
+
+  return RC_PC_OK;
 }
 
 /*
