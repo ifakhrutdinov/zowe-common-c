@@ -10,7 +10,7 @@
   Copyright Contributors to the Zowe Project.
 */
 
-#ifdef METTLE
+#ifndef METTLE
 /* HAS NOT BEEN COMPILED WITH METTLE BEFORE */
 #else
 #include <stdbool.h>
@@ -625,6 +625,68 @@ void addMemberedDatasetMetadata(char *datasetName, int nameLength,
 }
 #endif /* __ZOWE_OS_ZOS */
 
+static bool isDatasetFileNameValid(const char *name) {
+
+  /* Basic check. The file format is //'dsn(member)' */
+
+  /* Min dataset file name:
+   * //'              - 3
+   * min ds name      - 1
+   * '                - 1
+   */
+#define PATH_MIN_LENGTH 5
+
+  /* Max dataset file name:
+   * //'              - 3
+   * man ds name      - 44
+   * (                - 1
+   * max member name  - 8
+   * )                - 1
+   * '                - 1
+   */
+#define PATH_MAX_LENGTH 58
+
+  size_t length = strlen(name);
+
+  if (length < PATH_MIN_LENGTH || PATH_MAX_LENGTH < length) {
+    return false;
+  }
+
+  const char *leftParen = strchr(name, '(');
+  const char *rightParen = strchr(name, ')');
+  if (!leftParen ^ !rightParen) {
+    return false;
+  }
+
+  if (leftParen) {
+
+    if (leftParen - name > 44) {
+      return false;
+    }
+
+    if (rightParen != name + length - 1) {
+      return false;
+    }
+
+    ptrdiff_t memberNameLength = rightParen - leftParen;
+    if (memberNameLength < 0 || 8 < memberNameLength) {
+      return false;
+    }
+
+  } else {
+
+    if (44 < length) {
+      return false;
+    }
+
+  }
+
+#undef PATH_MIN_LENGTH
+#undef PATH_MAX_LENGTH
+
+  return true;
+}
+
 #ifdef __ZOWE_OS_ZOS
 static void updateDatasetWithJSON(HttpResponse *response, JsonObject *json, char *datasetPath) {
   JsonArray *recordArray = jsonObjectGetArray(json,"records");
@@ -1101,6 +1163,10 @@ void respondWithDataset(HttpResponse* response, char* absolutePath, int jsonMode
   DatasetName dsn = {.value = ' '};
   int absolutePathLen = strlen(absolutePath);
   int lParenIndex = indexOf(absolutePath, absolutePathLen,'(',0);
+
+  if (absolutePathLen - 3 > sizeof(dsn) &&
+      )
+
   if (lParenIndex > 0){
     memcpy(dsn.value,absolutePath+3,lParenIndex-3);
   }
