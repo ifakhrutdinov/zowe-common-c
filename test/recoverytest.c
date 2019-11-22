@@ -151,6 +151,58 @@ static void printMessage(RecoveryContext * __ptr32 context,
   printf("%s\n", userData);
 }
 
+static void testRecoveryOnNewLSFrame(void) {
+
+  __asm(
+#ifdef _LP64
+      "         OILL    %[retAddr],X'0001'                                     \n"
+#else
+      "         OILH    %[retAddr],X'8000'                                     \n"
+#endif
+      "         BAKR    %[retAddr],0                                           \n"
+      :
+      : [retAddr]"r"(&&exit_func)
+      :
+  );
+
+  printf("testRecoveryOnNewLSFrame entered\n");
+
+  int pushRC = recoveryPush("testBAKR()",
+                            RCVR_FLAG_RETRY | RCVR_FLAG_DELETE_ON_RETRY,
+                            "Recovery dump",
+                            NULL, NULL,
+                            NULL, NULL);
+
+  if (pushRC == RC_RCV_OK) {
+    int i = 9 / 0;
+  } else {
+    printf("testRecoveryOnNewLSFrame recovered from an ABEND\n");
+  }
+
+  if (pushRC == RC_RCV_OK) {
+    recoveryPop();
+  }
+
+  char regs[128];
+
+  __asm volatile (
+      "         STMG    1,15,0(%[regs])                                        \n"
+      "         PR      ,                                                      \n"
+      :
+      : [regs]"NR:r15"(&regs)
+      : "r15"
+  );
+
+  exit_func:
+
+  __asm volatile (
+      "         LMG     1,15,0(15)                                             \n"
+  );
+
+  printf("testRecoveryOnNewLSFrame ended\n");
+
+}
+
 #else /* zOS targets */
 
 #define INIT_ZOS_ENV_IF_NEEDED()\
@@ -421,6 +473,10 @@ int main() {
 
   pthread_join(osThread1->threadID, NULL);
   pthread_join(osThread2->threadID, NULL);
+#endif
+
+#ifdef __ZOWE_OS_ZOS
+  testRecoveryOnNewLSFrame();
 #endif
 
   printf("info: recovery test successful\n");
