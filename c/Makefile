@@ -55,7 +55,8 @@ all: srb_test
 
 # links
 srb_test: $(OBJS)
-	$(LD) $(LDFLAGS) $(LDFLAGSR) -e main -o "//'SSUSER1.DEV.LOADLIB(SRBTEST)'" $(OBJS) $(DEPS) > $@.lnklst || { rm -f $@; exit 1; }
+	$(LD) $(LDFLAGS) $(LDFLAGSR) -e main -o $@ $(OBJS) $(DEPS) > $@.lnklst || { rm -f $@; exit 1; }
+	extattr +a $@ 
 
 # cleanup rules
 clean:

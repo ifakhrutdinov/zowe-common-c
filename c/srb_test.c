@@ -7,6 +7,7 @@
 #include "metalio.h"
 
 #include "zowetypes.h"
+#include "alloc.h"
 #include "crossmemory.h"
 #include "recovery.h"
 #include "zos.h"
@@ -109,6 +110,63 @@ RecoveryContext *rcvrgcxt() {
   __asm("  " : "=NR:r12"(recoveryContextHandle));
 
   return *recoveryContextHandle;
+
+}
+
+static int writeSMF(const void * __ptr32 smfRecord) {
+
+#pragma insert_asm(" IEESMCA , ")
+
+  ALLOC_STRUCT31(
+    STRUCT31_NAME(below2G),
+    STRUCT31_FIELDS(
+      char saveArea[72];
+      char workArea[20];
+    )
+  );
+
+  int rc = 0;
+
+  int wasProblem = supervisorMode(TRUE);
+  int oldKey = setKey(0);
+
+  char subSystem[4] = "SYS ";
+
+  __asm(
+      ASM_PREFIX
+#ifdef _LP64
+      "         SAM31                                                          \n"
+      "         SYSSTATE AMODE64=NO                                            \n"
+#endif
+      "         LR    2,13                                                     \n"
+      "         LR    13,%[saveArea]                                           \n"
+      "         SMFEWTM (%[record]),BRANCH=YES,SUBSYS=(%[ss]),WRKAREA=(%[wrka])\n"
+      "         LR    13,2                                                     \n"
+#ifdef _LP64
+      "         SAM64                                                          \n"
+      "         SYSSTATE AMODE64=YES                                           \n"
+#endif
+
+      : "=NR:r15"(rc)
+
+      : [record]"r"(smfRecord),
+        [saveArea]"r"(&below2G->saveArea),
+        [ss]"r"(&subSystem),
+        [wrka]"r"(&below2G->workArea)
+
+      : "r0", "r1", "r2", "r14", "r15"
+  );
+
+  setKey(oldKey);
+  if (wasProblem) {
+    supervisorMode(FALSE);
+  }
+
+  FREE_STRUCT31(
+    STRUCT31_NAME(below2G)
+  );
+
+  return rc;
 }
 
 static void srb_routine(void) {
@@ -122,7 +180,7 @@ static void srb_routine(void) {
   recoveryEstablishRouter(0);
 
   int pushRC = recoveryPush("srb_routine()",
-                            RCVR_FLAG_RETRY | RCVR_FLAG_DELETE_ON_RETRY | RCVR_FLAG_PRODUCE_DUMP,
+                            RCVR_FLAG_RETRY | RCVR_FLAG_DELETE_ON_RETRY,
                             "Recovery dump",
                             NULL, NULL,
                             NULL, NULL);
@@ -141,6 +199,49 @@ static void srb_routine(void) {
 
   int cms_rc = cmsPrintf(&(CrossMemoryServerName){"ZWESIS_IRF      "},
                          "You've got a message from an SRB\n");
+
+  char record[1024];
+  memset(record, 'A', sizeof(record));
+
+  __packed struct {
+    short length;
+    short segmentDescriptor;
+    int flags : 8;
+#define SMF_FLAG_SUBTYPE_VALID 0x40
+    int type : 8;
+    int time;
+    int date;
+    char sid[4];
+    char ssi[4];
+    uint16_t subtype;
+  } *smfHeader = (void *)record;
+
+  smfHeader->length = 888;
+  smfHeader->flags |= SMF_FLAG_SUBTYPE_VALID;
+  smfHeader->type = 30;
+  smfHeader->time = 33333;
+  smfHeader->date = 11111;
+  memcpy(smfHeader->sid, "SS01", sizeof(smfHeader->sid));
+  memcpy(smfHeader->ssi, "SYS ", sizeof(smfHeader->ssi));
+  smfHeader->subtype = 112;
+
+  int wasProblem = supervisorMode(TRUE);
+  int oldKey = setKey(0);
+
+  int rc;
+  for (int i = 0 ; i < 10; i++) {
+    rc = writeSMF(smfHeader);
+    if (rc != 20) {
+      break;
+    }
+  }
+
+  wto("IREK_TEST: SMF rc=%d", rc);
+
+  setKey(oldKey);
+  if (wasProblem) {
+    supervisorMode(FALSE);
+  }
 
   wto("IREK_TEST: done with SRB, cms_rc=%d", cms_rc);
 
