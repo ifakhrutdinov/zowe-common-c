@@ -2,8 +2,8 @@ COMMON = ..
 
 # compiler
 CC = xlc
-CFLAGS = -S -O -qmetal -q64 -qnoinline -DSUBPOOL=230 -DMETTLE=1 -DMSGPREFIX='"TST"' \
-         -DCMS_CLIENT -DNOIBMHTTP -qmakedep \
+CFLAGS = -S -qmetal -q64 -qnoinline -DSUBPOOL=230 -DMETTLE=1 -DMSGPREFIX='"TST"' \
+         -DCMS_CLIENT -DCUSTOM_CONTEXT_GETTER -DNOIBMHTTP -qmakedep \
          -Wc,'arch(8),roconst,agg,exp,list(),so(),off,xref,roconst,longname,lp64' \
          -qreserved_reg=r12 -qnosearch -I/usr/include/metal -I/usr/include
 

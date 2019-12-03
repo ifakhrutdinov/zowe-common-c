@@ -8,6 +8,7 @@
 
 #include "zowetypes.h"
 #include "crossmemory.h"
+#include "recovery.h"
 #include "zos.h"
 
 #pragma prolog(srb_routine,\
@@ -92,9 +93,51 @@ static void wto(const char *format, ...) {
 
 }
 
+int rcvrscxt(RecoveryContext *context) {
+
+  RecoveryContext **recoveryContextHandle = NULL;
+  __asm("  " : "=NR:r12"(recoveryContextHandle));
+
+  *recoveryContextHandle = context;
+
+  return RC_RCV_OK;
+}
+
+RecoveryContext *rcvrgcxt() {
+
+  RecoveryContext **recoveryContextHandle = NULL;
+  __asm("  " : "=NR:r12"(recoveryContextHandle));
+
+  return *recoveryContextHandle;
+}
+
 static void srb_routine(void) {
 
   wto("IREK_TEST: hi from an SRB");
+
+  RecoveryContext *recoveryContext = NULL;
+  RecoveryContext **recoveryContextHandle = &recoveryContext;
+  __asm("  " : : "NR:r12"(recoveryContextHandle));
+
+  recoveryEstablishRouter(0);
+
+  int pushRC = recoveryPush("srb_routine()",
+                            RCVR_FLAG_RETRY | RCVR_FLAG_DELETE_ON_RETRY | RCVR_FLAG_PRODUCE_DUMP,
+                            "Recovery dump",
+                            NULL, NULL,
+                            NULL, NULL);
+
+  if (pushRC == RC_RCV_OK) {
+    int i = 9 / 0;
+  } else {
+    wto("srb_routine recovered from an ABEND\n");
+  }
+
+  if (pushRC == RC_RCV_OK) {
+    recoveryPop();
+  }
+
+  recoveryRemoveRouter();
 
   int cms_rc = cmsPrintf(&(CrossMemoryServerName){"ZWESIS_IRF      "},
                          "You've got a message from an SRB\n");
