@@ -1198,9 +1198,15 @@ ZOWE_PRAGMA_PACK_RESET
 "        PUSH  USING                              \n\
 LSSPRLG  LARL  10,LSSPRLG                         \n\
          USING LSSPRLG,10                         \n\
-         STORAGE OBTAIN,COND=YES,LENGTH=65536,CALLRKY=YES,SP=132,LOC=31,BNDRY=PAGE \n\
-         LTR   15,15                              \n\
-         BZ    LSSINIT                            \n\
+         LGR   5,4                                \n\
+         LLGT  2,0(0,5)                           \n\
+         L     2,224(0,2)                         \n\
+         SAM31                                    \n\
+         CPOOL GET,C,CPID=(2),REGS=USE            \n\
+         SAM64                                    \n\
+         LLGFR 1,1                                \n\
+         LTR   1,1                                \n\
+         BNZ   LSSINIT                            \n\
          LA    15,52                              \n\
          EREGG 0,1                                \n\
          PR                                       \n\
@@ -1210,7 +1216,7 @@ LSSINIT  DS    0H                                 \n\
          EREGG 1,1                                \n\
          MVC   PCHSAEYE,=C'F1SA'                  \n\
          MVC   PCHPLEYE,=C'RSPCHEYE'              \n\
-         STG   4,PCHPLLPL                         \n\
+         STG   5,PCHPLLPL                         \n\
          STG   1,PCHPLUPL                         \n\
          LA    1,PCHPARM                          \n\
          LA    13,PCHSA                           \n\
@@ -1224,19 +1230,20 @@ LSSRET   DS    0H                                 \n\
 #pragma epilog(handlePCSS,\
 "        PUSH  USING                              \n\
          SLGFI 13,PCHPARML                        \n\
-         LGR   1,13                               \n\
-         LGR   2,15                               \n\
+         LGR   3,13                               \n\
+         LGR   4,15                               \n\
          LARL  10,&CCN_BEGIN                      \n\
          USING &CCN_BEGIN,10                      \n\
-         STORAGE RELEASE,COND=YES,LENGTH=65536,CALLRKY=YES,SP=132,ADDR=(1) \n\
-         LTR   15,15                              \n\
-         BZ    LSSTERM                            \n\
-         LTR   2,2                                \n\
-         BNZ   LSSTERM                            \n\
-         LA    2,53                               \n\
+         USING PCHSTACK,13                        \n\
+         LG    5,PCHPLLPL                         \n\
+         LLGT  2,0(0,5)                           \n\
+         L     2,224(0,2)                         \n\
+         SAM31                                    \n\
+         CPOOL FREE,CPID=(2),CELL=(3),REGS=USE    \n\
+         SAM64                                    \n\
 LSSTERM  DS    0H                                 \n\
          DROP  10                                 \n\
-         LGR   15,2                               \n\
+         LGR   15,4                               \n\
          EREGG 0,1                                \n\
          PR                                       \n\
          DROP                                     \n\
@@ -1895,6 +1902,78 @@ static void termStandardServices(CrossMemoryServer *server) {
 
 }
 
+ZOWE_PRAGMA_PACK
+
+typedef struct CPHeader_tag {
+  char text[24];
+} CPHeader;
+
+ZOWE_PRAGMA_PACK_RESET
+
+static CPID cellpoolBuild(unsigned int pCellCount,
+                          unsigned int sCellCount,
+                          unsigned int cellSize,
+                          int subpool, int key,
+                          const CPHeader *header) {
+
+  CPID cpid = -1;
+
+  ALLOC_STRUCT31(
+    STRUCT31_NAME(below2G),
+    STRUCT31_FIELDS(
+      char parmList[64];
+      CPHeader header;
+    )
+  );
+
+  if (below2G == NULL) { /* This can only fail in LE 64-bit */
+    return cpid;
+  }
+
+  below2G->header = *header;
+
+  __asm(
+
+      ASM_PREFIX
+      "         SYSSTATE PUSH                                                  \n"
+      "         SYSSTATE OSREL=ZOSV1R6                                         \n"
+#ifdef _LP64
+      "         SAM31                                                          \n"
+      "         SYSSTATE AMODE64=NO                                            \n"
+#endif
+
+      "         CPOOL BUILD"
+      ",PCELLCT=(%[pcell])"
+      ",SCELLCT=(%[scell])"
+      ",CSIZE=(%[csize])"
+      ",SP=(%[sp])"
+      ",KEY=(%[key])"
+      ",LOC=(31,64)"
+      ",CPID=(%[cpid])"
+      ",HDR=%[header]"
+      ",MF=(E,%[parmList])"
+      "                                                                        \n"
+
+#ifdef _LP64
+      "         SAM64                                                          \n"
+#endif
+      "         SYSSTATE POP                                                   \n"
+
+      : [cpid]"=NR:r0"(cpid)
+      : [pcell]"r"(pCellCount), [scell]"r"(sCellCount), [csize]"r"(cellSize),
+        [sp]"r"(subpool), [key]"r"(key), [header]"m"(below2G->header),
+        [parmList]"m"(below2G->parmList)
+      : "r0", "r1", "r14", "r15"
+  );
+
+  FREE_STRUCT31(
+    STRUCT31_NAME(below2G)
+  );
+
+  return cpid;
+}
+
+
 CrossMemoryServer *makeCrossMemoryServer(STCBase *base,
                                          const CrossMemoryServerName *name,
                                          unsigned int flags, int *reasonCode) {
@@ -2491,6 +2570,11 @@ static int allocateGlobalResources(CrossMemoryServer *server) {
   char *moduleAddressLocal = (char *)getMyModuleAddressAndSize(NULL);
   char *handlerAddressLPA = handlerAddressLocal - moduleAddressLocal + moduleAddressLPA;
   globalArea->pccpHandler = (int (*)())handlerAddressLPA;
+
+  globalArea->pcssStackCP = cellpoolBuild(256, 0, 65535,
+                                          CROSS_MEMORY_SERVER_SUBPOOL,
+                                          CROSS_MEMORY_SERVER_KEY,
+                                          &(CPHeader){"ZWESPCSSCELLPOOL        "});
 
   zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_DEBUG, CMS_LOG_DEBUG_MSG_ID" localModuleAddress=0x%08X, handlerAddressLocal=0x%08X, moduleAddressLPA=0x%08X, handlerAddressLPA=0x%08X\n",
       moduleAddressLocal, handlerAddressLocal, moduleAddressLPA, handlerAddressLPA);

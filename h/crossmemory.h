@@ -189,6 +189,9 @@ typedef struct CMSTimestamp_tag {
   char value[32];
 } CMSBuildTimestamp;
 
+
+typedef int32_t CPID;
+
 typedef struct CrossMemoryServerGlobalArea_tag {
 
   char eyecatcher[8];
@@ -224,7 +227,10 @@ typedef struct CrossMemoryServerGlobalArea_tag {
   } pcInfo;
 
   int pcLogLevel;
-  char reserved3[504];
+
+  CPID pcssStackCP;
+
+  char reserved3[500];
 
   CrossMemoryService serviceTable[CROSS_MEMEORY_SERVER_MAX_SERVICE_COUNT];
 
