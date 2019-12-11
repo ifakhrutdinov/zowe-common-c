@@ -29,6 +29,7 @@
 
 #include "zowetypes.h"
 #include "alloc.h"
+#include "cellpool.h"
 #include "cmutils.h"
 #include "crossmemory.h"
 #include "lpa.h"
@@ -1902,78 +1903,6 @@ static void termStandardServices(CrossMemoryServer *server) {
 
 }
 
-ZOWE_PRAGMA_PACK
-
-typedef struct CPHeader_tag {
-  char text[24];
-} CPHeader;
-
-ZOWE_PRAGMA_PACK_RESET
-
-static CPID cellpoolBuild(unsigned int pCellCount,
-                          unsigned int sCellCount,
-                          unsigned int cellSize,
-                          int subpool, int key,
-                          const CPHeader *header) {
-
-  CPID cpid = -1;
-
-  ALLOC_STRUCT31(
-    STRUCT31_NAME(below2G),
-    STRUCT31_FIELDS(
-      char parmList[64];
-      CPHeader header;
-    )
-  );
-
-  if (below2G == NULL) { /* This can only fail in LE 64-bit */
-    return cpid;
-  }
-
-  below2G->header = *header;
-
-  __asm(
-
-      ASM_PREFIX
-      "         SYSSTATE PUSH                                                  \n"
-      "         SYSSTATE OSREL=ZOSV1R6                                         \n"
-#ifdef _LP64
-      "         SAM31                                                          \n"
-      "         SYSSTATE AMODE64=NO                                            \n"
-#endif
-
-      "         CPOOL BUILD"
-      ",PCELLCT=(%[pcell])"
-      ",SCELLCT=(%[scell])"
-      ",CSIZE=(%[csize])"
-      ",SP=(%[sp])"
-      ",KEY=(%[key])"
-      ",LOC=(31,64)"
-      ",CPID=(%[cpid])"
-      ",HDR=%[header]"
-      ",MF=(E,%[parmList])"
-      "                                                                        \n"
-
-#ifdef _LP64
-      "         SAM64                                                          \n"
-#endif
-      "         SYSSTATE POP                                                   \n"
-
-      : [cpid]"=NR:r0"(cpid)
-      : [pcell]"r"(pCellCount), [scell]"r"(sCellCount), [csize]"r"(cellSize),
-        [sp]"r"(subpool), [key]"r"(key), [header]"m"(below2G->header),
-        [parmList]"m"(below2G->parmList)
-      : "r0", "r1", "r14", "r15"
-  );
-
-  FREE_STRUCT31(
-    STRUCT31_NAME(below2G)
-  );
-
-  return cpid;
-}
-
-
 CrossMemoryServer *makeCrossMemoryServer(STCBase *base,
                                          const CrossMemoryServerName *name,
                                          unsigned int flags, int *reasonCode) {
@@ -2571,8 +2500,8 @@ static int allocateGlobalResources(CrossMemoryServer *server) {
   char *handlerAddressLPA = handlerAddressLocal - moduleAddressLocal + moduleAddressLPA;
   globalArea->pccpHandler = (int (*)())handlerAddressLPA;
 
-  globalArea->pcssStackCP = cellpoolBuild(256, 0, 65535,
-                                          CROSS_MEMORY_SERVER_SUBPOOL,
+  globalArea->pcssStackCP = cellpoolBuild(256, 0, 65536,
+                                          230,
                                           CROSS_MEMORY_SERVER_KEY,
                                           &(CPHeader){"ZWESPCSSCELLPOOL        "});
 
