@@ -22,6 +22,7 @@
 #include <metal/stdlib.h>
 #include "zowetypes.h"
 #include "metalio.h"
+#include "cellpool.h"
 
 #else
 #include <stdio.h>
@@ -1043,10 +1044,15 @@ Queue *makeQueue(int flags){
 #elif defined(__ZOWE_OS_LINUX) || defined(__ZOWE_OS_AIX)
   pthread_mutex_init(&(q->mutex),NULL); /* PTHREAD_MUTEX_INITIALIZER; */
 #endif
+
+  q->cpid = cellpoolBuild(512, 128, sizeof(QueueElement), 132, 4,
+                          &(CPHeader){"ZOWELFQ                 "});
+
   return q;
 }
 
 void destroyQueue(Queue *q) {
+  cellpoolDelete(q->cpid);
   safeFree((char*) q, sizeof(Queue));
 }
 
@@ -1145,7 +1151,7 @@ void qInsert(Queue *q, void *newData){
   };
 
   QueueElement *newElement = NULL;
-  newElement = (QueueElement*)safeMalloc(sizeof(QueueElement),"Q Element");
+  newElement = cellpoolGet(q->cpid, false);
   newElement->data = newData;
   newElement->next = NULL;
 
@@ -1347,7 +1353,7 @@ void *qRemove(Queue *q){
   if (currentHead)
   {
     result = currentHead->data;
-    safeFree31((char*)currentHead,sizeof(QueueElement));
+    cellpoolFree(q->cpid, currentHead);
   }
 
   return result;

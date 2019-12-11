@@ -247,6 +247,7 @@ typedef struct Queue_tag{
   int           flags;
   PAD_LONG(x18, QueueElement *head);
   PAD_LONG(x20, QueueElement *tail);
+  int cpid;
 #ifndef __ZOWE_OS_ZOS
   Mutex         mutex;
 #endif
