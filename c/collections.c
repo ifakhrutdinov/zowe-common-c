@@ -1045,7 +1045,7 @@ Queue *makeQueue(int flags){
   pthread_mutex_init(&(q->mutex),NULL); /* PTHREAD_MUTEX_INITIALIZER; */
 #endif
 
-  q->cpid = cellpoolBuild(512, 128, sizeof(QueueElement), 132, 4,
+  q->cpid = cellpoolBuild(1024 * 128, 1024 * 32, sizeof(QueueElement), 132, 4,
                           &(CPHeader){"ZOWELFQ                 "});
 
   return q;
