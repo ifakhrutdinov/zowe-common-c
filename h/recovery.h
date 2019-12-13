@@ -265,9 +265,11 @@ typedef struct RecoveryContext_tag {
 #define RCVR_ROUTER_FLAG_NON_INTERRUPTIBLE    0x01000000
 #define RCVR_ROUTER_FLAG_PC_CAPABLE           0x02000000
 #define RCVR_ROUTER_FLAG_RUN_ON_TERM          0x04000000
+#define RCVR_ROUTER_FLAG_USER_CONTEXT         0x08000000
   int previousESPIEToken;
   unsigned char routerPSWKey;
-  char reserved1[7];
+  char reserved1[3];
+  int cpid;
   RecoveryStateEntry * __ptr32 recoveryStateChain;
   void * __ptr32 caa;
   RecoveryServiceInfo serviceInfo;
@@ -353,6 +355,7 @@ typedef struct RecoveryContext_tag {
 *   of the RC_RCV_xxxx error codes.
 *****************************************************************************/
 int recoveryEstablishRouter(int flags);
+int recoveryEstablishRouter2(RecoveryContext *userContext, int flags);
 
 /*****************************************************************************
 * Remove the recovery router.
