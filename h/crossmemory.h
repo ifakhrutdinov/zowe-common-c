@@ -229,8 +229,9 @@ typedef struct CrossMemoryServerGlobalArea_tag {
   int pcLogLevel;
 
   CPID pcssStackCP;
+  RecoveryStatePool recoveryCP;
 
-  char reserved3[500];
+  char reserved3[496];
 
   CrossMemoryService serviceTable[CROSS_MEMEORY_SERVER_MAX_SERVICE_COUNT];
 

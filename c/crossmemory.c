@@ -1432,17 +1432,20 @@ typedef struct PCRoutineEnvironment_tag {
 #define PC_ROUTINE_ENV_EYECATCHER  "RSPCEEYE"
   CAA dummyCAA;
   RLETask dummyRLETask;
+  RecoveryContext recoveryContext;
 } PCRoutineEnvironment;
 ZOWE_PRAGMA_PACK_RESET
 
-#define INIT_PC_ENVIRONMENT(envAddr) \
+#define INIT_PC_ENVIRONMENT(cmsGlobalAreaAddr, envAddr) \
   ({ \
     memset((envAddr), 0, sizeof(PCRoutineEnvironment)); \
     memcpy((envAddr)->eyecatcher, PC_ROUTINE_ENV_EYECATCHER, sizeof((envAddr)->eyecatcher)); \
     (envAddr)->dummyCAA.rleTask = &(envAddr)->dummyRLETask; \
     int returnCode = RC_CMS_OK; \
     __asm(" LA    12,0(,%0) " : : "r"(&(envAddr)->dummyCAA) : ); \
-    int recoveryRC = recoveryEstablishRouter(RCVR_ROUTER_FLAG_PC_CAPABLE | \
+    int recoveryRC = recoveryEstablishRouter2(&(envAddr)->recoveryContext, \
+                                              (cmsGlobalAreaAddr)->recoveryCP, \
+                                             RCVR_ROUTER_FLAG_PC_CAPABLE | \
                                              RCVR_ROUTER_FLAG_RUN_ON_TERM); \
     if (recoveryRC != RC_RCV_OK) { \
       returnCode = RC_CMS_ERROR; \
@@ -1558,25 +1561,8 @@ static int handleStandardService(CrossMemoryServer *server, CrossMemoryServerPar
 static int handleUnsafeProgramCall(PCHandlerParmList *parmList,
                                    bool isSpaceSwitchPC) {
 
-  if (parmList == NULL) {
-    return RC_CMS_PARM_NULL;
-  }
-  if (memcmp(parmList->eyecatcher, PC_HANDLER_PARM_EYECATCHER, sizeof(parmList->eyecatcher))) {
-    return RC_CMS_PC_HDLR_PARM_BAD_EYECATCHER;
-  }
-
   LatentParmList *latentParmList = parmList->latentParmList;
-  if (latentParmList == NULL) {
-    return RC_CMS_LATENT_PARM_NULL;
-  }
-
   CrossMemoryServerGlobalArea *globalArea = latentParmList->parm1;
-  if (globalArea == NULL) {
-    return RC_CMS_GLOBAL_AREA_NULL;
-  }
-  if (memcmp(globalArea->eyecatcher, CMS_GLOBAL_AREA_EYECATCHER, sizeof(globalArea->eyecatcher))) {
-    return RC_CMS_GLOBAL_AREA_BAD_EYECATCHER;
-  }
 
   CrossMemoryServerParmList *userParmList = parmList->userParmList;
   if (userParmList == NULL) {
@@ -1660,8 +1646,30 @@ static int handleUnsafeProgramCall(PCHandlerParmList *parmList,
 
 static int handleProgramCall(PCHandlerParmList *parmList, bool isSpaceSwitchPC) {
 
+  if (parmList == NULL) {
+    return RC_CMS_PARM_NULL;
+  }
+  if (memcmp(parmList->eyecatcher, PC_HANDLER_PARM_EYECATCHER,
+             sizeof(parmList->eyecatcher))) {
+    return RC_CMS_PC_HDLR_PARM_BAD_EYECATCHER;
+  }
+
+  LatentParmList *latentParmList = parmList->latentParmList;
+  if (latentParmList == NULL) {
+    return RC_CMS_LATENT_PARM_NULL;
+  }
+
+  CrossMemoryServerGlobalArea *globalArea = latentParmList->parm1;
+  if (globalArea == NULL) {
+    return RC_CMS_GLOBAL_AREA_NULL;
+  }
+  if (memcmp(globalArea->eyecatcher, CMS_GLOBAL_AREA_EYECATCHER,
+             sizeof(globalArea->eyecatcher))) {
+    return RC_CMS_GLOBAL_AREA_BAD_EYECATCHER;
+  }
+
   PCRoutineEnvironment env;
-  int envRC = INIT_PC_ENVIRONMENT(&env);
+  int envRC = INIT_PC_ENVIRONMENT(globalArea, &env);
   if (envRC != RC_CMS_OK) {
     return RC_CMS_PC_ENV_NOT_ESTABLISHED;
   }
@@ -2504,6 +2512,8 @@ static int allocateGlobalResources(CrossMemoryServer *server) {
                                           230,
                                           CROSS_MEMORY_SERVER_KEY,
                                           &(CPHeader){"ZWESPCSSCELLPOOL        "});
+
+  globalArea->recoveryCP = recoveryMakeStatePool(1024, 256);
 
   zowelog(NULL, LOG_COMP_ID_CMS, ZOWE_LOG_DEBUG, CMS_LOG_DEBUG_MSG_ID" localModuleAddress=0x%08X, handlerAddressLocal=0x%08X, moduleAddressLPA=0x%08X, handlerAddressLPA=0x%08X\n",
       moduleAddressLocal, handlerAddressLocal, moduleAddressLPA, handlerAddressLPA);

@@ -258,6 +258,8 @@ typedef struct RecoveryStateEntry_tag {
 
 } RecoveryStateEntry;
 
+typedef uint32_t RecoveryStatePool;
+
 typedef struct RecoveryContext_tag {
   char eyecatcher[8]; /* RSRCVCTX */
   int flags;
@@ -266,10 +268,12 @@ typedef struct RecoveryContext_tag {
 #define RCVR_ROUTER_FLAG_PC_CAPABLE           0x02000000
 #define RCVR_ROUTER_FLAG_RUN_ON_TERM          0x04000000
 #define RCVR_ROUTER_FLAG_USER_CONTEXT         0x08000000
+#define RCVR_ROUTER_FLAG_SRB                  0x10000000
+#define RCVR_ROUTER_FLAG_LOCKED               0x20000000
   int previousESPIEToken;
   unsigned char routerPSWKey;
   char reserved1[3];
-  int cpid;
+  RecoveryStatePool statePool;
   RecoveryStateEntry * __ptr32 recoveryStateChain;
   void * __ptr32 caa;
   RecoveryServiceInfo serviceInfo;
@@ -355,7 +359,13 @@ typedef struct RecoveryContext_tag {
 *   of the RC_RCV_xxxx error codes.
 *****************************************************************************/
 int recoveryEstablishRouter(int flags);
-int recoveryEstablishRouter2(RecoveryContext *userContext, int flags);
+
+int recoveryEstablishRouter2(RecoveryContext *userContext,
+                             RecoveryStatePool statePool,
+                             int flags);
+
+RecoveryStatePool recoveryMakeStatePool(uint32_t primaryCellCount,
+                                        uint32_t secondaryCellCount);
 
 /*****************************************************************************
 * Remove the recovery router.
