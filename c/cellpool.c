@@ -26,6 +26,18 @@
 #include "cellpool.h"
 #include "zos.h"
 
+unsigned int cellpoolGetDWordAlignedSize(unsigned int size) {
+
+  unsigned rem = size % 8;
+
+  if (rem == 0) {
+    return size;
+  }
+
+  return size + 8 - rem;
+
+}
+
 CPID cellpoolBuild(unsigned int pCellCount,
                    unsigned int sCellCount,
                    unsigned int cellSize,

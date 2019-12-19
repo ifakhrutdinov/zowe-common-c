@@ -193,6 +193,7 @@ ZOWE_PRAGMA_PACK_RESET
 #define RC_RCV_CONTEXT_NOT_SET    12
 #define RC_RCV_SIGACTION_FAILED   13
 #define RC_RCV_LNKSTACK_ERROR     14
+#define RC_RCV_ALLOC_FAILED       15
 #define RC_RCV_ABENDED            100
 
 #ifdef __ZOWE_OS_ZOS
@@ -270,6 +271,7 @@ typedef struct RecoveryContext_tag {
 #define RCVR_ROUTER_FLAG_USER_CONTEXT         0x08000000
 #define RCVR_ROUTER_FLAG_SRB                  0x10000000
 #define RCVR_ROUTER_FLAG_LOCKED               0x20000000
+#define RCVR_ROUTER_FLAG_FRR                  0x40000000
   int previousESPIEToken;
   unsigned char routerPSWKey;
   char reserved1[3];

@@ -730,6 +730,7 @@ void recoveryDESCTs(){
       "R@CF1UCX EQU   X'08'                                                    \n"
       "R@CF1SRB EQU   X'10'                                                    \n"
       "R@CF1LCK EQU   X'20'                                                    \n"
+      "R@CF1FRR EQU   X'40'                                                    \n"
       "RCXFLAG2 DS    X                                                        \n"
       "RCXFLAG3 DS    X                                                        \n"
       "RCXFLAG4 DS    X                                                        \n"
@@ -950,7 +951,7 @@ static bool isLocked(void) {
       "         SAM31                                                          \n"
       "         SYSSTATE AMODE64=NO                                            \n"
 #endif
-      "         SETLOCK TEST,TYPE=LOCAL                                        \n"
+      "         SETLOCK TEST,TYPE=ALOCAL                                       \n"
 #ifdef _LP64
       "         SAM64                                                          \n"
       "         SYSSTATE AMODE64=YES                                           \n"
@@ -977,6 +978,11 @@ int recoveryEstablishRouter2(RecoveryContext *userContext,
   bool lockHeld = isLocked();
   if (lockHeld) {
     flags |= RCVR_ROUTER_FLAG_LOCKED;
+  }
+
+  bool frrRequired = !isTCB || lockHeld;
+  if (frrRequired) {
+    flags |= RCVR_ROUTER_FLAG_FRR;
   }
 
   /* set dummy ESPIE */
@@ -1032,7 +1038,7 @@ int recoveryEstablishRouter2(RecoveryContext *userContext,
   );
 
 
-  if (isTCB && !lockHeld) {
+  if (!frrRequired) {
 
     /* ESTAEX */
     char estaexFlags = 0;
@@ -1078,9 +1084,11 @@ RecoveryStatePool recoveryMakeStatePool(uint32_t primaryCellCount,
   StackedState stackedState = getStackedState(STACKED_STATE_EXTRACTION_CODE_01);
   uint8_t pswKey = (stackedState.state01.psw & 0x00F0000000000000LLU) >> 52;
 
+  unsigned alignedCellSize =
+      cellpoolGetDWordAlignedSize(sizeof(RecoveryStateEntry));
   RecoveryStatePool poolID = cellpoolBuild(primaryCellCount,
                                            secondaryCellCount,
-                                           sizeof(RecoveryStateEntry),
+                                           alignedCellSize,
                                            SUBPOOL, pswKey,
                                            &(CPHeader){"ZWESRECOVERYSTATEPOOL   "});
 
@@ -1246,10 +1254,7 @@ int recoveryRemoveRouter() {
 
   int returnCode = RC_RCV_OK;
 
-  /* Which DU are we? */
-  bool isTCB = getTCB() ? true : false;
-
-  if (isTCB) {
+  if (!(context->flags & RCVR_ROUTER_FLAG_FRR)) {
 
   ESTAEXFeedback feedback = deleteESTAEX();
   if (feedback.returnCode != 0) {
@@ -1362,7 +1367,11 @@ static RecoveryStateEntry *addRecoveryStateEntry(RecoveryContext *context, char 
                                                  AnalysisFunction *userAnalysisFunction, void * __ptr32 analysisFunctionUserData,
                                                  CleanupFunction *userCleanupFunction, void * __ptr32 cleanupFunctionUserData) {
 
-  RecoveryStateEntry *newEntry = storageObtain(sizeof(RecoveryStateEntry));
+  RecoveryStateEntry *newEntry = cellpoolGet(context->statePool, true);
+  if (newEntry == NULL) {
+    return NULL;
+  }
+
   memset(newEntry, 0, sizeof(RecoveryStateEntry));
   memcpy(newEntry->eyecatcher, "RSRSENTR", sizeof(newEntry->eyecatcher));
 
@@ -1511,6 +1520,9 @@ int recoveryPush(char *name, int flags, char *dumpTitle,
       addRecoveryStateEntry(context, name, flags, dumpTitle,
                             userAnalysisFunction, analysisFunctionUserData,
                             userCleanupFunction, cleanupFunctionUserData);
+  if (newEntry == NULL) {
+    return RC_RCV_ALLOC_FAILED;
+  }
 
   newEntry->linkageStackToken = linkageStackToken;
 

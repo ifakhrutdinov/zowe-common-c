@@ -25,6 +25,7 @@
 
 #ifndef __LONGNAME__
 
+#define cellpoolGetDWordAlignedSize CPASIZE
 #define cellpoolBuild CPBUILD
 #define cellpoolDelete CPDELETE
 #define cellpoolGet CPGET
@@ -41,6 +42,8 @@ typedef struct CPHeader_tag {
 } CPHeader;
 
 ZOWE_PRAGMA_PACK_RESET
+
+unsigned int cellpoolGetDWordAlignedSize(unsigned int size);
 
 CPID cellpoolBuild(unsigned int pCellCount,
                    unsigned int sCellCount,
