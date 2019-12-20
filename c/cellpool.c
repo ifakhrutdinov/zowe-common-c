@@ -130,7 +130,7 @@ void cellpoolDelete(CPID cellpoolID) {
 
 void *cellpoolGet(CPID cellpoolID, bool conditional) {
 
-  uint64 callerGPRs[12] = {0};
+  uint64_t callerGPRs[12] = {0};
 
   void * __ptr32 cell = NULL;
 
@@ -197,7 +197,7 @@ void *cellpoolGet(CPID cellpoolID, bool conditional) {
 
 void cellpoolFree(CPID cellpoolID, void *cell) {
 
-  uint64 callerGPRs[12] = {0};
+  uint64_t callerGPRs[12] = {0};
 
   /*
    * Notes about the use of callerGPRs:
@@ -426,8 +426,338 @@ static int testCellPool(void) {
   return status;
 }
 
+#ifdef _LP64
 
-#ifdef CMUTILS_TEST
+ZOWE_PRAGMA_PACK
+
+typedef struct IARCP64ParmList_tag {
+  unsigned char version;
+  unsigned char flags1;
+#define IARCP64_FLAGS1_COMMON_YES       0x80
+#define IARCP64_FLAGS1_FPROT_YES        0x40
+#define IARCP64_FLAGS1_TYPE_DREF        0x20
+#define IARCP64_FLAGS1_TYPE_FIXED       0x10
+#define IARCP64_FLAGS1_PRESERVE_YES     0x08
+#define IARCP64_FLAGS1_FAILMODE_RC      0x04
+#define IARCP64_FLAGS1_MEMLIMIT_NO      0x02
+#define IARCP64_FLAGS1_KEYUSED_MOTKN    0x01
+  unsigned char flags2;
+#define IARCP64_FLAGS2_OWNER_PRIMARY    0x20
+#define IARCP64_FLAGS2_OWNER_SECONDARY  0x10
+#define IARCP64_FLAGS2_OWNER_HOME       0x08
+#define IARCP64_FLAGS2_OWNER_BYASID     0x02
+#define IARCP64_FLAGS2_CALLERKEY_NO     0x01
+  unsigned char flags3;
+#define IARCP64_FLAGS3_TRAILER_YES      0x80
+#define IARCP64_FLAGS3_TRAILER_NO       0x40
+#define IARCP64_FLAGS3_LOCALSYSAREA_YES 0x20
+#define IARCP64_FLAGS3_EXTENTSIZE_2G    0x10
+  unsigned char dumpprio;
+  unsigned char dump;
+#define IARCP64_DUMP_LIKERGN            0x80
+#define IARCP64_DUMP_LIKELSQA           0x40
+#define IARCP64_DUMP_LIKECSA            0x20
+#define IARCP64_DUMP_LIKESQA            0x10
+  unsigned char owningTask;
+#define IARCP64_OWNINGTASK_MOTHER       0x80
+#define IARCP64_OWNINGTASK_IPT          0x40
+#define IARCP64_OWNINGTASK_JOBSTEP      0x20
+#define IARCP64_OWNINGTASK_CMRO         0x10
+#define IARCP64_OWNINGTASK_RCT          0x08
+#define IARCP64_OWNINGTASK_CURRENT      0x00
+  char reserved0[2];
+  unsigned char key00ToF0;
+  unsigned short owningASID;
+  unsigned int cellSize;
+  union {
+    struct {
+      CPID64 outputCPID;
+      CPHeader header;
+      uint64_t motkn;
+      char reserved1[16];
+    };
+    struct {
+      CPID64 inputCPID;
+    };
+  };
+} IARCP64ParmList;
+
+ZOWE_PRAGMA_PACK_RESET
+
+ZOWE_PRAGMA_PACK
+
+typedef struct BuildFlags_tag {
+  char flags1;
+  char flags2;
+  char flags3;
+} BuildFlags;
+
+typedef unsigned char OwningTask;
+
+ZOWE_PRAGMA_PACK_RESET
+
+static int iarcp64Build(const CPHeader *header,
+                        unsigned int cellSize,
+                        BuildFlags flags,
+                        OwningTask task,
+                        CPID64 *id,
+                        int *reasonCode) {
+
+  IARCP64ParmList cpParmList;
+  memset(&cpParmList, 0, sizeof(IARCP64ParmList));
+  cpParmList.flags1 |= IARCP64_FLAGS1_FPROT_YES;
+  cpParmList.flags1 |= IARCP64_FLAGS1_FAILMODE_RC;
+  cpParmList.flags3 |= IARCP64_FLAGS3_TRAILER_NO;
+  cpParmList.flags1 |= flags.flags1;
+  cpParmList.flags2 |= flags.flags2;
+  cpParmList.flags3 |= flags.flags3;
+  cpParmList.dumpprio = 50;
+  cpParmList.dump |= IARCP64_DUMP_LIKERGN;
+  cpParmList.owningTask = task;
+  cpParmList.cellSize = cellSize;
+  memcpy(&cpParmList.header, header, sizeof(CPHeader));
+
+  int rc = 0, rsn = 0;
+  uint64_t parmListAddress = (uint64)&cpParmList;
+
+  __asm(
+      ASM_PREFIX
+      /* load parm list to R1 */
+      "         LG    1,0(,%2)                                                 \n"
+#ifndef _LP64
+      "         SAM64                                                          \n"
+#endif
+      /* call IARCP64 */
+      "         LG    14,72(0,0)                                               \n"
+      "         L     14,772(14,0)                                             \n"
+      "         L     14,208(14,0)                                             \n"
+      "         OILL  14,16                                                    \n"
+      "         PC    0(14)                                                    \n"
+#ifndef _LP64
+      "         SAM31                                                          \n"
+#endif
+      /* save RC and RSN */
+      "         ST    15,%0                                                    \n"
+      "         ST    0,%1                                                     \n"
+      : "=m"(rc), "=m"(rsn)
+      : "r"(&parmListAddress)
+      : "r0", "r1", "r14", "r15"
+  );
+
+  if (rc == 0) {
+    *id = cpParmList.inputCPID;
+  } else {
+    *reasonCode = rsn;
+  }
+  return rc;
+}
+
+#define IARCP64_GET_FLAGS_FAILMODE_RC   0x0001
+#define IARCP64_GET_FLAGS_EXPAND_NO     0x0002
+#define IARCP64_GET_FLAGS_TRACE_NO      0x0004
+
+static int iarcp64Get(CPID64 id,
+                      unsigned short flags,
+                      void **cell,
+                      int *reasonCode) {
+
+  struct {
+    char eyecatcher[8];
+    uint64_t prev;
+    uint64_t next;
+    uint64_t gprs[15];
+  } iarcp64SaveArea;
+
+  int rc = 0, rsn = 0;
+  void *localCell;
+
+  __asm(
+      ASM_PREFIX
+      /* load input parms (flags, pool ID) */
+      "         LLGH  0,0(,%2)                                                 \n"
+      "         LG    1,0(,%3)                                                 \n"
+      /* save GPRs */
+      "         STG   13,8(,%4)                                                \n"
+      "         LA    13,0(,%4)                                                \n"
+      "         STMG  2,12,40(13)                                              \n"
+#ifndef _LP64
+      "         SAM64                                                          \n"
+#endif
+      /* call IARCP64 */
+      "         LG    14,X'7A8'(0,0)                                           \n"
+      "         LG    15,X'008'(14,0)                                          \n"
+      "         BASR  14,15                                                    \n"
+#ifndef _LP64
+      "         SAM31                                                          \n"
+#endif
+      /* restore GPRs */
+      "         LMG   2,12,40(13)                                              \n"
+      "         LG    13,8(,13)                                                \n"
+      /* save cell, RC and RSN */
+      "         STG   1,0(,%5)                                                 \n"
+      "         ST    15,%0                                                    \n"
+      "         ST    0,%1                                                     \n"
+      : "=m"(rc), "=m"(rsn)
+      : "r"(&flags), "r"(&id), "r"(&iarcp64SaveArea), "r"(&localCell)
+      : "r0", "r1", "r14", "r15"
+  );
+
+
+  if (rc == 0) {
+    *cell = localCell;
+  } else {
+    *reasonCode = rsn;
+  }
+  return rc;
+}
+
+static void iarcp64Free(void *cell) {
+
+  struct {
+    char eyecatcher[8];
+    uint64_t prev;
+    uint64_t next;
+    uint64_t gprs[15];
+  } iarcp64SaveArea;
+
+  __asm(
+      ASM_PREFIX
+      /* load cell to R1 */
+      "         LG    1,0(,%0)                                                 \n"
+      /* save GPRs */
+      "         STG   13,8(,%1)                                                \n"
+      "         LA    13,0(,%1)                                                \n"
+      "         STMG  2,12,40(13)                                              \n"
+#ifndef _LP64
+      "         SAM64                                                          \n"
+#endif
+      /* call IARCP64 */
+      "         LG    14,X'7A8'(0,0)                                           \n"
+      "         LG    15,X'010'(14,0)                                          \n"
+      "         BASR  14,15                                                    \n"
+#ifndef _LP64
+      "         SAM31                                                          \n"
+#endif
+      /* restore GPRs */
+      "         LMG   2,12,40(13)                                              \n"
+      "         LG    13,8(,13)                                                \n"
+      :
+      : "r"(&cell), "r"(&iarcp64SaveArea)
+      : "r0", "r1", "r14", "r15"
+  );
+
+}
+
+static void iarcp64Delete(CPID64 id) {
+
+  __asm(
+      ASM_PREFIX
+      /* load pool ID to R1 */
+      "         LG    1,0(,%0)                                                 \n"
+#ifndef _LP64
+      "         SAM64                                                          \n"
+#endif
+      /* call IARCP64 */
+      "         LG    14,72(0,0)                                               \n"
+      "         L     14,772(14,0)                                             \n"
+      "         L     14,208(14,0)                                             \n"
+      "         OILL  14,21                                                    \n"
+      "         PC    0(14)                                                    \n"
+#ifndef _LP64
+      "         SAM31                                                          \n"
+#endif
+      :
+      : "r"(&id)
+      : "r0", "r1", "r14", "r15"
+  );
+
+}
+
+#define CELL_POOL_FLAGS_NONE                0x00000000
+#define CELL_POOL_FLAGS_CROSS_MEMORY_OWNER  0x00000001
+
+CPID64 cellpoolBuild64(unsigned int cellSize,
+                       const CPHeader *header,
+                       int *serviceRC) {
+
+  CPID64 id;
+
+  BuildFlags iarcp64Flags = {0, 0, 0};
+  OwningTask owningTask = IARCP64_OWNINGTASK_CURRENT;
+
+  int buildRC = 0, buildRSN = 0;
+  buildRC = iarcp64Build(header, cellSize, iarcp64Flags, owningTask, &id,
+                         &buildRSN);
+  if (buildRC != 0) {
+    if (serviceRC != NULL) {
+      *serviceRC = (buildRC << 16);
+      *serviceRC |= ((buildRSN >> 8) & 0x0000FFFF);
+    }
+  }
+
+  return id;
+}
+
+CPID64 cellpoolBuild64Xmem(unsigned int cellSize,
+                           const CPHeader *header,
+                           int *serviceRC) {
+
+  CPID64 id;
+
+  BuildFlags iarcp64Flags = {0, 0, 0};
+  OwningTask owningTask = IARCP64_OWNINGTASK_CMRO;
+
+  int buildRC = 0, buildRSN = 0;
+  buildRC = iarcp64Build(header, cellSize, iarcp64Flags, owningTask, &id,
+                         &buildRSN);
+  if (buildRC != 0) {
+    if (serviceRC != NULL) {
+      *serviceRC = (buildRC << 16);
+      *serviceRC |= ((buildRSN >> 8) & 0x0000FFFF);
+    }
+  }
+
+  return id;
+}
+
+void cellpoolDelete64(CPID64 id) {
+
+  iarcp64Delete(id);
+
+}
+
+void *cellpoolGet64(CPID64 id,
+                    bool noExpansion,
+                    int *serviceRC) {
+
+  unsigned short flags = 0;
+  flags |= IARCP64_GET_FLAGS_TRACE_NO;
+  flags |= IARCP64_GET_FLAGS_FAILMODE_RC;
+  if (noExpansion) {
+    flags |= IARCP64_GET_FLAGS_EXPAND_NO;
+  }
+
+  void *cell = NULL;
+
+  int getRC = 0, getRSN = 0;
+  getRC = iarcp64Get(id, flags, &cell, &getRSN);
+  if (getRC != 0) {
+    if (serviceRC != NULL) {
+      *serviceRC = (getRC << 16);
+      *serviceRC |= ((getRSN >> 8) & 0x0000FFFF);
+    }
+  }
+
+  return cell;
+}
+
+void cellpoolFree64(CPID64 id, void *cell) {
+  iarcp64Free(cell);
+}
+
+#endif /* _LP64 */
+
+#ifdef CELLPOOL_TEST
 int main() {
 #else
 static int notMain() {

@@ -31,11 +31,18 @@
 #define cellpoolGet CPGET
 #define cellpoolFree CPFREE
 
+#define cellpoolBuild64 CP4BUILD
+#define cellpoolBuild64Xmem CP4XBLD
+#define cellpoolDelete64 CP4DEL
+#define cellpoolGet CP4GET
+#define cellpoolFree64 CP4FREE
+
 #endif
 
 ZOWE_PRAGMA_PACK
 
 typedef int32_t CPID;
+typedef int64_t CPID64;
 
 typedef struct CPHeader_tag {
   char text[24];
@@ -56,6 +63,26 @@ void cellpoolDelete(CPID cellpoolID);
 void *cellpoolGet(CPID cellpoolID, bool conditional);
 
 void cellpoolFree(CPID cellpoolID, void *cell);
+
+#ifdef _LP64
+
+CPID64 cellpoolBuild64(unsigned int cellSize,
+                       const CPHeader *header,
+                       int *serviceRC);
+
+CPID64 cellpoolBuild64Xmem(unsigned int cellSize,
+                           const CPHeader *header,
+                           int *serviceRC);
+
+void cellpoolDelete64(CPID64 id);
+
+void *cellpoolGet64(CPID64 id,
+                    bool noExpansion,
+                    int *serviceRC);
+
+void cellpoolFree64(CPID64 id, void *cell);
+
+#endif
 
 #endif /* H_CELLPOOL_H_ */
 
