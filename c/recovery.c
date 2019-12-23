@@ -945,6 +945,27 @@ static StackedState getStackedState(StackedStateExtractionCode code) {
 static bool isLocked(void) {
 
   int rc = 0;
+
+  __asm(
+      ASM_PREFIX
+#ifdef _LP64
+      "         SAM31                                                          \n"
+      "         SYSSTATE AMODE64=NO                                            \n"
+#endif
+      "         SETLOCK TEST,TYPE=CMS                                          \n"
+#ifdef _LP64
+      "         SAM64                                                          \n"
+      "         SYSSTATE AMODE64=YES                                           \n"
+#endif
+      : "=NR:r15"(rc)
+      :
+      : "r1"
+  );
+
+  if (!rc) {
+    return true;
+  }
+
   __asm(
       ASM_PREFIX
 #ifdef _LP64
@@ -1051,7 +1072,15 @@ int recoveryEstablishRouter2(RecoveryContext *userContext,
 
     ESTAEXFeedback feedback = setESTAEX(getRecoveryRouterAddress(), context,
                                         estaexFlags);
-    if (feedback.returnCode != 0) {
+
+    // TODO: This is a hack. Find a better way to test for FRR.
+    if (feedback.returnCode == 0x30) {
+
+      setFRR(getRecoveryRouterAddress(), context,
+             flags & RCVR_ROUTER_FLAG_NON_INTERRUPTIBLE);
+      context->flags |= RCVR_ROUTER_FLAG_FRR;
+
+    } else if (feedback.returnCode != 0) {
 #if RECOVERY_TRACING
       printf("error: set ESTAEX RC = %d, RSN = %d\n",
              feedback.returnCode, feedback.reasonCode);
