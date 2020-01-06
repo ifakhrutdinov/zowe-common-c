@@ -29,6 +29,9 @@
 
 #ifndef __LONGNAME__
 
+#define cmCopyWithDestinationKey CMCPWDK
+#define cmCopyWithSourceKey CMCPWSK
+
 #define cmCopyToSecondaryWithCallerKey CMCPTSSK
 #define cmCopyFromSecondaryWithCallerKey CMCPFSSK
 #define cmCopyToPrimaryWithCallerKey CMCPTPSK
@@ -53,6 +56,18 @@
 #define crossMemoryMapIterate CMUMAPIT
 
 #endif
+
+void cmCopyWithDestinationKey(void *dest,
+                              unsigned int destKey,
+                              unsigned int destALET,
+                              const void *src,
+                              size_t size);
+
+void cmCopyWithSourceKey(void *dest,
+                         const void *src,
+                         unsigned int srcKey,
+                         unsigned int srcALET,
+                         size_t size);
 
 void cmCopyToSecondaryWithCallerKey(void *dest, const void *src, size_t size);
 void cmCopyFromSecondaryWithCallerKey(void *dest, const void *src, size_t size);

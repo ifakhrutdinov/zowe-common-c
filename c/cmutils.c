@@ -185,6 +185,26 @@ static void copyWithSourceKey(void *dest,
 
 }
 
+void cmCopyWithDestinationKey(void *dest,
+                              unsigned int destKey,
+                              unsigned int destALET,
+                              const void *src,
+                              size_t size) {
+
+  copyWithDestinationKey(dest, destKey, destALET, src, size);
+
+}
+
+void cmCopyWithSourceKey(void *dest,
+                         const void *src,
+                         unsigned int srcKey,
+                         unsigned int srcALET,
+                         size_t size) {
+
+  copyWithSourceKey(dest, src, srcKey, srcALET, size);
+
+}
+
 void cmCopyToSecondaryWithCallerKey(void *dest, const void *src, size_t size) {
   copyWithDestinationKey(dest, getCallersKey(), CROSS_MEMORY_ALET_SASN, src, size);
 }
