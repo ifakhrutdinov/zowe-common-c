@@ -952,7 +952,7 @@ static bool isLocked(void) {
       "         SAM31                                                          \n"
       "         SYSSTATE AMODE64=NO                                            \n"
 #endif
-      "         SETLOCK TEST,TYPE=CMS                                          \n"
+      "         SETLOCK TEST,TYPE=CPU                                          \n"
 #ifdef _LP64
       "         SAM64                                                          \n"
       "         SYSSTATE AMODE64=YES                                           \n"
