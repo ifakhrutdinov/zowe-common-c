@@ -23,7 +23,6 @@
 
 #include "zowetypes.h"
 #include "alloc.h"
-#include "cellpool.h"
 #include "cmutils.h"
 #include "zos.h"
 
@@ -388,6 +387,213 @@ void cmFree2(void **dataPtr, unsigned int size, int subpool, int key) {
 
 ZOWE_PRAGMA_PACK
 
+typedef int32_t CPID;
+
+typedef struct CMCPHeader_tag {
+  char text[24];
+} CMCPHeader;
+
+ZOWE_PRAGMA_PACK_RESET
+
+static CPID cmCellPoolBuild(unsigned int pCellCount,
+                            unsigned int sCellCount,
+                            unsigned int cellSize,
+                            int subpool, int key,
+                            const CMCPHeader *header) {
+
+  CPID cpid = -1;
+
+  ALLOC_STRUCT31(
+    STRUCT31_NAME(below2G),
+    STRUCT31_FIELDS(
+      char parmList[64];
+      CMCPHeader header;
+    )
+  );
+
+  if (below2G == NULL) { /* This can only fail in LE 64-bit */
+    return cpid;
+  }
+
+  below2G->header = *header;
+
+  __asm(
+
+      ASM_PREFIX
+      "         SYSSTATE PUSH                                                  \n"
+      "         SYSSTATE OSREL=ZOSV1R6                                         \n"
+#ifdef _LP64
+      "         SAM31                                                          \n"
+      "         SYSSTATE AMODE64=NO                                            \n"
+#endif
+
+      "         CPOOL BUILD"
+      ",PCELLCT=(%[pcell])"
+      ",SCELLCT=(%[scell])"
+      ",CSIZE=(%[csize])"
+      ",SP=(%[sp])"
+      ",KEY=(%[key])"
+      ",LOC=(31,64)"
+      ",CPID=(%[cpid])"
+      ",HDR=%[header]"
+      ",MF=(E,%[parmList])"
+      "                                                                        \n"
+
+#ifdef _LP64
+      "         SAM64                                                          \n"
+#endif
+      "         SYSSTATE POP                                                   \n"
+
+      : [cpid]"=NR:r0"(cpid)
+      : [pcell]"r"(pCellCount), [scell]"r"(sCellCount), [csize]"r"(cellSize),
+        [sp]"r"(subpool), [key]"r"(key), [header]"m"(below2G->header),
+        [parmList]"m"(below2G->parmList)
+      : "r0", "r1", "r14", "r15"
+  );
+
+  FREE_STRUCT31(
+    STRUCT31_NAME(below2G)
+  );
+
+  return cpid;
+}
+
+static void cmCellPoolDelete(CPID cellpoolID) {
+
+  __asm(
+
+      ASM_PREFIX
+      "         SYSSTATE PUSH                                                  \n"
+      "         SYSSTATE OSREL=ZOSV1R6                                         \n"
+#ifdef _LP64
+      "         SAM31                                                          \n"
+      "         SYSSTATE AMODE64=NO                                            \n"
+#endif
+
+      "         CPOOL DELETE,CPID=(%[cpid])                                    \n"
+
+#ifdef _LP64
+      "         SAM64                                                          \n"
+#endif
+      "         SYSSTATE POP                                                   \n"
+
+      :
+      : [cpid]"r"(cellpoolID)
+      : "r0", "r1", "r14", "r15"
+  );
+
+}
+
+static void *cmCellPoolGet(CPID cellpoolID, bool conditional) {
+
+  uint64 callerGPRs[12] = {0};
+
+  void * __ptr32 cell = NULL;
+
+  /*
+   * Notes about the use of callerGPRs:
+   *
+   * - The registers must be saved before switching to AMODE 31 and restored
+   *   after switching back to AMODE 64, because the stack storage containing
+   *   the callerGPRs may be above 2G.
+   *
+   * - Register 13 is being saved in callerGPRs, changed to point to callerGPRs,
+   *   and then restored back to its original value when the registers are
+   *   restored. All parameters must be passed in registers on the CPOOL request
+   *   because of R13 being changed.
+   *
+   */
+
+  if (conditional) {
+    __asm(
+
+        ASM_PREFIX
+        "         STMG  2,13,%[gprs]                                             \n"
+        "         LA    13,%[gprs]                                               \n"
+  #ifdef _LP64
+        "         SAM31                                                          \n"
+  #endif
+
+        "         CPOOL GET,C,CPID=(%[cpid]),REGS=USE                            \n"
+
+  #ifdef _LP64
+        "         SAM64                                                          \n"
+  #endif
+        "         LMG   2,13,0(13)                                               \n"
+
+        : [cell]"=NR:r1"(cell)
+        : [gprs]"m"(callerGPRs), [cpid]"NR:r1"(cellpoolID)
+        : "r0", "r1", "r14", "r15"
+    );
+  } else {
+    __asm(
+
+        ASM_PREFIX
+        "         STMG  2,13,%[gprs]                                             \n"
+        "         LA    13,%[gprs]                                               \n"
+  #ifdef _LP64
+        "         SAM31                                                          \n"
+  #endif
+
+        "         CPOOL GET,U,CPID=(%[cpid]),REGS=USE                            \n"
+
+  #ifdef _LP64
+        "         SAM64                                                          \n"
+  #endif
+        "         LMG   2,13,0(13)                                               \n"
+
+        : [cell]"=NR:r1"(cell)
+        : [gprs]"m"(callerGPRs), [cpid]"NR:r1"(cellpoolID)
+        : "r0", "r1", "r14", "r15"
+    );
+  }
+
+  return cell;
+}
+
+static void cmCellPoolFree(CPID cellpoolID, void *cell) {
+
+  uint64 callerGPRs[12] = {0};
+
+  /*
+   * Notes about the use of callerGPRs:
+   *
+   * - The registers must be saved before switching to AMODE 31 and restored
+   *   after switching back to AMODE 64, because the stack storage containing
+   *   the callerGPRs may be above 2G.
+   *
+   * - Register 13 is being saved in callerGPRs, changed to point to callerGPRs,
+   *   and then restored back to its original value when the registers are
+   *   restored. All parameters must be passed in registers on the CPOOL request
+   *   because of R13 being changed.
+   *
+   */
+
+  __asm(
+
+      ASM_PREFIX
+      "         STMG  2,13,%[gprs]                                             \n"
+      "         LA    13,%[gprs]                                               \n"
+#ifdef _LP64
+      "         SAM31                                                          \n"
+#endif
+
+      "         CPOOL FREE,CPID=(%[cpid]),CELL=(%[cell]),REGS=USE              \n"
+
+#ifdef _LP64
+      "         SAM64                                                          \n"
+#endif
+      "         LMG   2,13,0(13)                                               \n"
+
+      :
+      : [gprs]"m"(callerGPRs), [cpid]"NR:r1"(cellpoolID), [cell]"NR:r0"(cell)
+      : "r0", "r1", "r14", "r15"
+  );
+
+}
+
+ZOWE_PRAGMA_PACK
+
 typedef struct CrossMemoryMapEntry_tag {
   char eyecatcher[4];
 #define CM_MAP_ENTRY_EYECATCHER "CMME"
@@ -449,7 +655,7 @@ CrossMemoryMap *makeCrossMemoryMap(unsigned int keySize) {
   map->keySize = keySize;
   map->bucketCount = CM_MAP_BUCKET_COUNT;
 
-  CPHeader header = {
+  CMCPHeader header = {
       .text = CM_MAP_HEADER,
   };
 
@@ -458,11 +664,11 @@ CrossMemoryMap *makeCrossMemoryMap(unsigned int keySize) {
   }
 
   map->entrySize = sizeof(CrossMemoryMapEntry) + keySize;
-  map->entryCellpool = cellpoolBuild(CM_MAP_PRIMARY_CELL_COUNT,
-                                     CM_MAP_SECONDARY_CELL_COUNT,
-                                     map->entrySize,
-                                     CM_MAP_SUBPOOL, CM_MAP_KEY,
-                                     &header);
+  map->entryCellpool = cmCellPoolBuild(CM_MAP_PRIMARY_CELL_COUNT,
+                                       CM_MAP_SECONDARY_CELL_COUNT,
+                                       map->entrySize,
+                                       CM_MAP_SUBPOOL, CM_MAP_KEY,
+                                       &header);
 
   return map;
 }
@@ -473,7 +679,7 @@ void removeCrossMemoryMap(CrossMemoryMap **mapAddr) {
   CPID cellpoolToDelete = map->entryCellpool;
   map->entryCellpool = -1;
   if (cellpoolToDelete != -1) {
-    cellpoolDelete(cellpoolToDelete);
+    cmCellPoolDelete(cellpoolToDelete);
   }
 #ifndef CMUTILS_TEST
   cmFree2((void **)mapAddr, map->size, CM_MAP_SUBPOOL, CM_MAP_KEY);
@@ -509,7 +715,7 @@ static CrossMemoryMapEntry *makeEntry(CrossMemoryMap *map,
                                       const void *key,
                                       void *value) {
 
-  CrossMemoryMapEntry *entry = cellpoolGet(map->entryCellpool, FALSE);
+  CrossMemoryMapEntry *entry = cmCellPoolGet(map->entryCellpool, FALSE);
   if (entry == NULL) {
     return NULL;
   }
@@ -524,7 +730,7 @@ static CrossMemoryMapEntry *makeEntry(CrossMemoryMap *map,
 }
 
 static void removeEntry(CrossMemoryMap *map, CrossMemoryMapEntry *entry) {
-  cellpoolFree(map->entryCellpool, entry);
+  cmCellPoolFree(map->entryCellpool, entry);
 }
 
 /* Put a new key-value into the map:
@@ -674,27 +880,27 @@ static int testUnconditionalCellPoolGet(void) {
   unsigned ssize = 2;
   unsigned cellSize = 512;
   int sp = 132, key = 8;
-  CPHeader header = {"TEST-CP-HEADER"};
+  CMCPHeader header = {"TEST-CP-HEADER"};
   bool isConditional = false;
 
-  CPID id = cellpoolBuild(psize, ssize, cellSize, sp, key, &header);
+  CPID id = cmCellPoolBuild(psize, ssize, cellSize, sp, key, &header);
   if (id == -1) {
-    printf("error: cellpoolBuild failed\n");
+    printf("error: cmCellPoolBuild failed\n");
     return CMUTILS_TEST_STATUS_FAILURE;
   }
 
   int status = CMUTILS_TEST_STATUS_OK;
 
   for (int i = 0; i < 100; i++) {
-    void *cell = cellpoolGet(id, isConditional);
+    void *cell = cmCellPoolGet(id, isConditional);
     if (cell == NULL) {
-      printf("error: cellpoolGet(unconditional) test failed, cell #%d\n", i);
+      printf("error: cmCellPoolGet(unconditional) test failed, cell #%d\n", i);
       status = CMUTILS_TEST_STATUS_FAILURE;
       break;
     }
   }
 
-  cellpoolDelete(id);
+  cmCellPoolDelete(id);
 
   return status;
 }
@@ -705,19 +911,19 @@ static int testConditionalCellPoolGet(void) {
   unsigned ssize = 2;
   unsigned cellSize = 512;
   int sp = 132, key = 8;
-  CPHeader header = {"TEST-CP-HEADER"};
+  CMCPHeader header = {"TEST-CP-HEADER"};
   bool isConditional = true;
 
-  CPID id = cellpoolBuild(psize, ssize, cellSize, sp, key, &header);
+  CPID id = cmCellPoolBuild(psize, ssize, cellSize, sp, key, &header);
   if (id == -1) {
-    printf("error: cellpoolBuild failed\n");
+    printf("error: cmCellPoolBuild failed\n");
     return CMUTILS_TEST_STATUS_FAILURE;
   }
 
   int status = CMUTILS_TEST_STATUS_FAILURE;
 
   for (int i = 0; i < psize + 1; i++) {
-    void *cell = cellpoolGet(id, isConditional);
+    void *cell = cmCellPoolGet(id, isConditional);
     if (cell == NULL && i == psize) {
         status = CMUTILS_TEST_STATUS_OK;
         break;
@@ -725,10 +931,10 @@ static int testConditionalCellPoolGet(void) {
   }
 
   if (status != CMUTILS_TEST_STATUS_OK) {
-    printf("error: cellpoolGet(conditional) test failed\n");
+    printf("error: cmCellPoolGet(conditional) test failed\n");
   }
 
-  cellpoolDelete(id);
+  cmCellPoolDelete(id);
 
   return status;
 }
@@ -739,23 +945,23 @@ static int testCellPoolFree(void) {
   unsigned ssize = 2;
   unsigned cellSize = 512;
   int sp = 132, key = 8;
-  CPHeader header = {"TEST-CP-HEADER"};
+  CMCPHeader header = {"TEST-CP-HEADER"};
   bool isConditional = true;
 
   void *cells[10] = {0};
 
-  CPID id = cellpoolBuild(psize, ssize, cellSize, sp, key, &header);
+  CPID id = cmCellPoolBuild(psize, ssize, cellSize, sp, key, &header);
   if (id == -1) {
-    printf("error: cellpoolBuild failed\n");
+    printf("error: cmCellPoolBuild failed\n");
     return CMUTILS_TEST_STATUS_FAILURE;
   }
 
   int status = CMUTILS_TEST_STATUS_OK;
 
   for (int i = 0; i < sizeof(cells) / sizeof(cells[0]); i++) {
-    cells[i] = cellpoolGet(id, isConditional);
+    cells[i] = cmCellPoolGet(id, isConditional);
     if (cells[i] == NULL) {
-      printf("error: cellpoolFree test failed (alloc 1), cell #%d\n", i);
+      printf("error: cmCellPoolFree test failed (alloc 1), cell #%d\n", i);
       status = CMUTILS_TEST_STATUS_FAILURE;
       break;
     }
@@ -764,14 +970,14 @@ static int testCellPoolFree(void) {
   if (status == CMUTILS_TEST_STATUS_OK) {
 
     for (int i = 0; i < sizeof(cells) / sizeof(cells[0]); i++) {
-      cellpoolFree(id, cells[i]);
+      cmCellPoolFree(id, cells[i]);
       cells[i] = NULL;
     }
 
     for (int i = 0; i < sizeof(cells) / sizeof(cells[0]); i++) {
-      cells[i] = cellpoolGet(id, isConditional);
+      cells[i] = cmCellPoolGet(id, isConditional);
       if (cells[i] == NULL) {
-        printf("error: cellpoolFree test failed (alloc 2), cell #%d\n", i);
+        printf("error: cmCellPoolFree test failed (alloc 2), cell #%d\n", i);
         status = CMUTILS_TEST_STATUS_FAILURE;
         break;
       }
@@ -779,7 +985,7 @@ static int testCellPoolFree(void) {
 
   }
 
-  cellpoolDelete(id);
+  cmCellPoolDelete(id);
 
   return status;
 }

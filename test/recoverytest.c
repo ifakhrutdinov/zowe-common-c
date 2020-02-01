@@ -203,6 +203,64 @@ static void testRecoveryOnNewLSFrame(void) {
 
 }
 
+#ifdef METTLE
+
+#include "srb_harness.h"
+
+#define SRB_TEST_EXPECTED_RETURN_VALUE 0xABCD9876
+
+static void srbFunction(uint32_t parm) {
+
+  uint32_t *returnValue = (uint32_t *)parm;
+
+#ifdef METTLE
+  establishGlobalEnvironment(makeRLEAnchor());
+#endif
+  INIT_ZOS_ENV_IF_NEEDED();
+
+  recoveryEstablishRouter(0);
+
+  int pushRC = recoveryPush("srb_routine()",
+                            RCVR_FLAG_RETRY | RCVR_FLAG_DELETE_ON_RETRY,
+                            "Recovery dump",
+                            NULL, NULL,
+                            NULL, NULL);
+
+  if (pushRC == RC_RCV_OK) {
+    int i = 9 / 0;
+  } else {
+    *returnValue = SRB_TEST_EXPECTED_RETURN_VALUE;
+  }
+
+  if (pushRC == RC_RCV_OK) {
+    recoveryPop();
+  }
+
+  recoveryRemoveRouter();
+
+}
+
+static int testRecoveryInSRB(void) {
+
+  uint32_t srbReturnValue = 0;
+
+  int runRC = run_in_srb(srbFunction, (uint32_t)&srbReturnValue);
+
+  if (runRC != 0) {
+    printf("error: SRB not run, rc = %d\n", runRC);
+    return 8;
+  }
+
+  if (srbReturnValue != SRB_TEST_EXPECTED_RETURN_VALUE) {
+    printf("error: unexpected value from SRB test - %u\n", srbReturnValue);
+    return 8;
+  }
+
+  return 0;
+}
+
+#endif /* METTLE */
+
 #else /* zOS targets */
 
 #define INIT_ZOS_ENV_IF_NEEDED()\
@@ -476,7 +534,16 @@ int main() {
 #endif
 
 #ifdef __ZOWE_OS_ZOS
+
   testRecoveryOnNewLSFrame();
+
+#ifdef METTLE
+  int srbTestRC = testRecoveryInSRB();
+  if (srbTestRC != 0) {
+    return 8;
+  }
+#endif
+
 #endif
 
   printf("info: recovery test successful\n");

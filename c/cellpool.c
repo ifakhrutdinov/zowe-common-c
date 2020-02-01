@@ -13,10 +13,12 @@
 #ifdef METTLE
 #include <metal/metal.h>
 #include <metal/stddef.h>
+#include <metal/stdint.h>
 #include <metal/stdlib.h>
 #include <metal/string.h>
 #else
 #include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #endif
@@ -44,7 +46,7 @@ CPID cellpoolBuild(unsigned int pCellCount,
                    int subpool, int key,
                    const CPHeader *header) {
 
-  CPID cpid = -1;
+  CPID cpid = CPID_NULL;
 
   ALLOC_STRUCT31(
     STRUCT31_NAME(below2G),
@@ -60,40 +62,94 @@ CPID cellpoolBuild(unsigned int pCellCount,
 
   below2G->header = *header;
 
-  __asm(
+  if (isCallerCrossMemory() || isCallerSRB()) {
 
-      ASM_PREFIX
-      "         SYSSTATE PUSH                                                  \n"
-      "         SYSSTATE OSREL=ZOSV1R6                                         \n"
-#ifdef _LP64
-      "         SAM31                                                          \n"
-      "         SYSSTATE AMODE64=NO                                            \n"
-#endif
+    __asm(
 
-      "         CPOOL BUILD"
-      ",PCELLCT=(%[pcell])"
-      ",SCELLCT=(%[scell])"
-      ",CSIZE=(%[csize])"
-      ",SP=(%[sp])"
-      ",KEY=(%[key])"
-      ",TCB=0"
-      ",LOC=(31,64)"
-      ",CPID=(%[cpid])"
-      ",HDR=%[header]"
-      ",MF=(E,%[parmList])"
-      "                                                                        \n"
+        ASM_PREFIX
+        "         SYSSTATE PUSH                                                  \n"
+        "         SYSSTATE OSREL=ZOSV1R6                                         \n"
+  #ifdef _LP64
+        "         SAM31                                                          \n"
+        "         SYSSTATE AMODE64=NO                                            \n"
+  #endif
 
-#ifdef _LP64
-      "         SAM64                                                          \n"
-#endif
-      "         SYSSTATE POP                                                   \n"
+        "         CPOOL BUILD"
+        ",PCELLCT=(%[pcell])"
+        ",SCELLCT=(%[scell])"
+        ",CSIZE=(%[csize])"
+        ",SP=(%[sp])"
+        ",KEY=(%[key])"
+        ",TCB=0"
+        ",LOC=(31,64)"
+        ",CPID=(%[cpid])"
+        ",HDR=%[header]"
+        ",MF=(E,%[parmList])"
+        "                                                                        \n"
 
-      : [cpid]"=NR:r0"(cpid)
-      : [pcell]"r"(pCellCount), [scell]"r"(sCellCount), [csize]"r"(cellSize),
-        [sp]"r"(subpool), [key]"r"(key), [header]"m"(below2G->header),
-        [parmList]"m"(below2G->parmList)
-      : "r0", "r1", "r14", "r15"
-  );
+  #ifdef _LP64
+        "         SAM64                                                          \n"
+  #endif
+        "         SYSSTATE POP                                                   \n"
+
+        : [cpid]"=NR:r0"(cpid)
+
+        : [pcell]"r"(pCellCount),
+          [scell]"r"(sCellCount),
+          [csize]"r"(cellSize),
+          [sp]"r"(subpool),
+          [key]"r"(key),
+          [header]"m"(below2G->header),
+          [parmList]"m"(below2G->parmList)
+
+        : "r0", "r1", "r14", "r15"
+
+    );
+
+  } else {
+
+    __asm(
+
+        ASM_PREFIX
+        "         SYSSTATE PUSH                                                  \n"
+        "         SYSSTATE OSREL=ZOSV1R6                                         \n"
+  #ifdef _LP64
+        "         SAM31                                                          \n"
+        "         SYSSTATE AMODE64=NO                                            \n"
+  #endif
+
+        "         CPOOL BUILD"
+        ",PCELLCT=(%[pcell])"
+        ",SCELLCT=(%[scell])"
+        ",CSIZE=(%[csize])"
+        ",SP=(%[sp])"
+        ",KEY=(%[key])"
+        ",LOC=(31,64)"
+        ",CPID=(%[cpid])"
+        ",HDR=%[header]"
+        ",MF=(E,%[parmList])"
+        "                                                                        \n"
+
+  #ifdef _LP64
+        "         SAM64                                                          \n"
+  #endif
+        "         SYSSTATE POP                                                   \n"
+
+        : [cpid]"=NR:r0"(cpid)
+
+        : [pcell]"r"(pCellCount),
+          [scell]"r"(sCellCount),
+          [csize]"r"(cellSize),
+          [sp]"r"(subpool),
+          [key]"r"(key),
+          [header]"m"(below2G->header),
+          [parmList]"m"(below2G->parmList)
+
+        : "r0", "r1", "r14", "r15"
+
+    );
+
+  }
 
   FREE_STRUCT31(
     STRUCT31_NAME(below2G)
@@ -242,9 +298,12 @@ LE:
 
 xlc "-Wa,goff" \
 "-Wc,LANGLVL(EXTC99),FLOAT(HEX),agg,exp,list(),so(),goff,xref,gonum,roconst,gonum,ASM,ASMLIB('SYS1.MACLIB'),LP64,XPLINK" \
--DCMUTILS_TEST -I ../h -o cellpool \
+-DCELLPOOL_TEST -I ../h -o cellpool \
 alloc.c \
 cellpool.c \
+timeutls.c \
+utils.c \
+zos.c \
 
 Metal:
 
@@ -257,7 +316,7 @@ ASFLAGS=(-mgoff -mobject -mflag=nocont --TERM --RENT)
 
 LDFLAGS=(-V -b ac=1 -b rent -b case=mixed -b map -b xref -b reus)
 
-xlc "${CFLAGS[@]}" -DCMUTILS_TEST \
+xlc "${CFLAGS[@]}" -DCELLPOOL_TEST \
 alloc.c \
 cellpool.c \
 metalio.c \
@@ -275,7 +334,7 @@ as "${ASFLAGS[@]}" -aegimrsx=utils.asm utils.s
 as "${ASFLAGS[@]}" -aegimrsx=zos.asm zos.s
 
 ld "${LDFLAGS[@]}" -e main \
--o "//'$USER.DEV.LOADLIB(CMUTILS)'" \
+-o "//'$USER.DEV.LOADLIB(CELLPOOL)'" \
 alloc.o \
 cellpool.o \
 metalio.o \
@@ -283,12 +342,12 @@ qsam.o \
 timeutls.o \
 utils.o \
 zos.o \
-> CMUTILS.link
+> CELLPOOL.link
 
 */
 
-#define CMUTILS_TEST_STATUS_OK        0
-#define CMUTILS_TEST_STATUS_FAILURE   8
+#define CELLPOOL_TEST_STATUS_OK        0
+#define CELLPOOL_TEST_STATUS_FAILURE   8
 
 static int testUnconditionalCellPoolGet(void) {
 
@@ -300,18 +359,18 @@ static int testUnconditionalCellPoolGet(void) {
   bool isConditional = false;
 
   CPID id = cellpoolBuild(psize, ssize, cellSize, sp, key, &header);
-  if (id == -1) {
+  if (id == CPID_NULL) {
     printf("error: cellpoolBuild failed\n");
-    return CMUTILS_TEST_STATUS_FAILURE;
+    return CELLPOOL_TEST_STATUS_FAILURE;
   }
 
-  int status = CMUTILS_TEST_STATUS_OK;
+  int status = CELLPOOL_TEST_STATUS_OK;
 
   for (int i = 0; i < 100; i++) {
     void *cell = cellpoolGet(id, isConditional);
     if (cell == NULL) {
       printf("error: cellpoolGet(unconditional) test failed, cell #%d\n", i);
-      status = CMUTILS_TEST_STATUS_FAILURE;
+      status = CELLPOOL_TEST_STATUS_FAILURE;
       break;
     }
   }
@@ -331,22 +390,22 @@ static int testConditionalCellPoolGet(void) {
   bool isConditional = true;
 
   CPID id = cellpoolBuild(psize, ssize, cellSize, sp, key, &header);
-  if (id == -1) {
+  if (id == CPID_NULL) {
     printf("error: cellpoolBuild failed\n");
-    return CMUTILS_TEST_STATUS_FAILURE;
+    return CELLPOOL_TEST_STATUS_FAILURE;
   }
 
-  int status = CMUTILS_TEST_STATUS_FAILURE;
+  int status = CELLPOOL_TEST_STATUS_FAILURE;
 
   for (int i = 0; i < psize + 1; i++) {
     void *cell = cellpoolGet(id, isConditional);
     if (cell == NULL && i == psize) {
-        status = CMUTILS_TEST_STATUS_OK;
+        status = CELLPOOL_TEST_STATUS_OK;
         break;
     }
   }
 
-  if (status != CMUTILS_TEST_STATUS_OK) {
+  if (status != CELLPOOL_TEST_STATUS_OK) {
     printf("error: cellpoolGet(conditional) test failed\n");
   }
 
@@ -367,23 +426,23 @@ static int testCellPoolFree(void) {
   void *cells[10] = {0};
 
   CPID id = cellpoolBuild(psize, ssize, cellSize, sp, key, &header);
-  if (id == -1) {
+  if (id == CPID_NULL) {
     printf("error: cellpoolBuild failed\n");
-    return CMUTILS_TEST_STATUS_FAILURE;
+    return CELLPOOL_TEST_STATUS_FAILURE;
   }
 
-  int status = CMUTILS_TEST_STATUS_OK;
+  int status = CELLPOOL_TEST_STATUS_OK;
 
   for (int i = 0; i < sizeof(cells) / sizeof(cells[0]); i++) {
     cells[i] = cellpoolGet(id, isConditional);
     if (cells[i] == NULL) {
       printf("error: cellpoolFree test failed (alloc 1), cell #%d\n", i);
-      status = CMUTILS_TEST_STATUS_FAILURE;
+      status = CELLPOOL_TEST_STATUS_FAILURE;
       break;
     }
   }
 
-  if (status == CMUTILS_TEST_STATUS_OK) {
+  if (status == CELLPOOL_TEST_STATUS_OK) {
 
     for (int i = 0; i < sizeof(cells) / sizeof(cells[0]); i++) {
       cellpoolFree(id, cells[i]);
@@ -394,7 +453,7 @@ static int testCellPoolFree(void) {
       cells[i] = cellpoolGet(id, isConditional);
       if (cells[i] == NULL) {
         printf("error: cellpoolFree test failed (alloc 2), cell #%d\n", i);
-        status = CMUTILS_TEST_STATUS_FAILURE;
+        status = CELLPOOL_TEST_STATUS_FAILURE;
         break;
       }
     }
@@ -409,17 +468,17 @@ static int testCellPoolFree(void) {
 
 static int testCellPool(void) {
 
-  int status = CMUTILS_TEST_STATUS_OK;
+  int status = CELLPOOL_TEST_STATUS_OK;
 
-  if (status == CMUTILS_TEST_STATUS_OK) {
+  if (status == CELLPOOL_TEST_STATUS_OK) {
     status = testUnconditionalCellPoolGet();
   }
 
-  if (status == CMUTILS_TEST_STATUS_OK) {
+  if (status == CELLPOOL_TEST_STATUS_OK) {
     status = testConditionalCellPoolGet();
   }
 
-  if (status == CMUTILS_TEST_STATUS_OK) {
+  if (status == CELLPOOL_TEST_STATUS_OK) {
     status = testCellPoolFree();
   }
 
@@ -765,11 +824,11 @@ static int notMain() {
 
   printf("info: starting cellpool test\n");
 
-  int status = CMUTILS_TEST_STATUS_OK;
+  int status = CELLPOOL_TEST_STATUS_OK;
 
   status = testCellPool();
 
-  if (status == CMUTILS_TEST_STATUS_OK) {
+  if (status == CELLPOOL_TEST_STATUS_OK) {
     printf("info: SUCCESS, tests have passed\n");
   } else {
     printf("error: FAILURE, some tests have failed\n");
