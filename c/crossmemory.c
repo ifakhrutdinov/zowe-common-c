@@ -1436,17 +1436,23 @@ typedef struct PCRoutineEnvironment_tag {
 } PCRoutineEnvironment;
 ZOWE_PRAGMA_PACK_RESET
 
-#define INIT_PC_ENVIRONMENT(cmsGlobalAreaAddr, envAddr) \
+#define INIT_PC_ENVIRONMENT(cmsGlobalAreaAddr, isSpaceSwitch, envAddr) \
   ({ \
     memset((envAddr), 0, sizeof(PCRoutineEnvironment)); \
     memcpy((envAddr)->eyecatcher, PC_ROUTINE_ENV_EYECATCHER, sizeof((envAddr)->eyecatcher)); \
     (envAddr)->dummyCAA.rleTask = &(envAddr)->dummyRLETask; \
     int returnCode = RC_CMS_OK; \
     __asm(" LA    12,0(,%0) " : : "r"(&(envAddr)->dummyCAA) : ); \
-    int recoveryRC = recoveryEstablishRouter2(&(envAddr)->recoveryContext, \
-                                              (cmsGlobalAreaAddr)->recoveryCP, \
-                                             RCVR_ROUTER_FLAG_PC_CAPABLE | \
-                                             RCVR_ROUTER_FLAG_RUN_ON_TERM); \
+    int recoveryRC = RC_RCV_OK; \
+    if (isSpaceSwitch) { \
+      recoveryRC = recoveryEstablishRouter2(&(envAddr)->recoveryContext, \
+                                            (cmsGlobalAreaAddr)->recoveryCP, \
+                                            RCVR_ROUTER_FLAG_PC_CAPABLE | \
+                                            RCVR_ROUTER_FLAG_RUN_ON_TERM); \
+    } else { \
+      recoveryRC = recoveryEstablishRouter(RCVR_ROUTER_FLAG_PC_CAPABLE | \
+                                           RCVR_ROUTER_FLAG_RUN_ON_TERM); \
+    } \
     if (recoveryRC != RC_RCV_OK) { \
       returnCode = RC_CMS_ERROR; \
     } \
@@ -1669,7 +1675,7 @@ static int handleProgramCall(PCHandlerParmList *parmList, bool isSpaceSwitchPC) 
   }
 
   PCRoutineEnvironment env;
-  int envRC = INIT_PC_ENVIRONMENT(globalArea, &env);
+  int envRC = INIT_PC_ENVIRONMENT(globalArea, isSpaceSwitchPC, &env);
   if (envRC != RC_CMS_OK) {
     return RC_CMS_PC_ENV_NOT_ESTABLISHED;
   }

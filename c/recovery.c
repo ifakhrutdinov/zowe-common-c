@@ -365,7 +365,7 @@ static void storageRelease(void *data, int size){
 #ifdef RCVR_CPOOL_STATES
 
   #ifndef RCVR_STATE_POOL_SUBPOOL
-  #define RCVR_STATE_POOL_SUBPOOL 0
+  #define RCVR_STATE_POOL_SUBPOOL 132
   #endif
 
   #ifndef RCVR_STATE_POOL_PRIMARY_COUNT
@@ -1043,7 +1043,7 @@ static RecoveryStatePool makeStatePool(unsigned int primaryCellCount,
   RecoveryStatePool poolID = cellpoolBuild(primaryCellCount,
                                            secondaryCellCount,
                                            alignedCellSize,
-                                           RCVR_STATE_POOL_SUBPOOL, pswKey,
+                                           storageSubpool, pswKey,
                                            &(CPHeader){"ZWESRECOVERYSTATEPOOL   "});
 
   return poolID;
