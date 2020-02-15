@@ -57,17 +57,27 @@
 
 #endif
 
-void cmCopyWithDestinationKey(void *dest,
-                              unsigned int destKey,
-                              unsigned int destALET,
-                              const void *src,
-                              size_t size);
+/**
+ * @brief Copy data to another address space with the destination key.
+ * @param dest Destination address.
+ * @param destKey Destination storage key.
+ * @param destALET Destination ALET.
+ * @param src Source address.
+ * @param size Size of the data to be copied.
+ */
+void cmCopyWithDestinationKey(void *dest, unsigned destKey, unsigned destALET,
+                              const void *src, size_t size);
 
-void cmCopyWithSourceKey(void *dest,
-                         const void *src,
-                         unsigned int srcKey,
-                         unsigned int srcALET,
-                         size_t size);
+/**
+ * @brief Copy data from another address space with the source key.
+ * @param dest Destination address.
+ * @param src Source address.
+ * @param srcKey Source storage key.
+ * @param srcALET Source ALET.
+ * @param size Size of the data to be copied.
+ */
+void cmCopyWithSourceKey(void *dest, const void *src, unsigned srcKey,
+                         unsigned srcALET, size_t size);
 
 void cmCopyToSecondaryWithCallerKey(void *dest, const void *src, size_t size);
 void cmCopyFromSecondaryWithCallerKey(void *dest, const void *src, size_t size);

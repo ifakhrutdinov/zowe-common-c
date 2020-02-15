@@ -22,7 +22,6 @@
 #include <metal/stdlib.h>
 #include "zowetypes.h"
 #include "metalio.h"
-#include "cellpool.h"
 
 #else
 #include <stdio.h>
@@ -1044,15 +1043,10 @@ Queue *makeQueue(int flags){
 #elif defined(__ZOWE_OS_LINUX) || defined(__ZOWE_OS_AIX)
   pthread_mutex_init(&(q->mutex),NULL); /* PTHREAD_MUTEX_INITIALIZER; */
 #endif
-
-  q->cpid = cellpoolBuild(1024 * 128, 1024 * 32, sizeof(QueueElement), 132, 4,
-                          &(CPHeader){"ZOWELFQ                 "});
-
   return q;
 }
 
 void destroyQueue(Queue *q) {
-  cellpoolDelete(q->cpid);
   safeFree((char*) q, sizeof(Queue));
 }
 
@@ -1143,16 +1137,13 @@ static int compareAndSwapTriple(long *oldCounter, long newCounter, long *counter
   return status;
 }
 
-void qInsert(Queue *q, void *newData){
+void qEnqueue(Queue *q, QueueElement *newElement) {
 
   union {
     long long alignit;
     CSTSTParms parms;
   };
 
-  QueueElement *newElement = NULL;
-  newElement = cellpoolGet(q->cpid, false);
-  newElement->data = newData;
   newElement->next = NULL;
 
   /* Note: The PLO compare value must alway be the first data fetched when
@@ -1243,7 +1234,17 @@ void qInsert(Queue *q, void *newData){
   return;
 }
 
-void *qRemove(Queue *q){
+void qInsert(Queue *q, void *newData) {
+
+  QueueElement *newElement = NULL;
+  newElement = (QueueElement *)safeMalloc(sizeof(QueueElement), "Q Element");
+  newElement->data = newData;
+
+  qEnqueue(q, newElement);
+
+}
+
+QueueElement *qDequeue(Queue *q) {
 
   union {
     long long alignit;
@@ -1349,11 +1350,17 @@ void *qRemove(Queue *q){
         break;
     }
   }
+
+  return currentHead;
+}
+
+void *qRemove(Queue *q) {
+
   void *result = NULL;
-  if (currentHead)
-  {
-    result = currentHead->data;
-    cellpoolFree(q->cpid, currentHead);
+  QueueElement *element = qDequeue(q);
+  if (element) {
+    result = element->data;
+    safeFree((char *)element, sizeof(QueueElement));
   }
 
   return result;

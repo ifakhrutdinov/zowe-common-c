@@ -184,21 +184,15 @@ static void copyWithSourceKey(void *dest,
 
 }
 
-void cmCopyWithDestinationKey(void *dest,
-                              unsigned int destKey,
-                              unsigned int destALET,
-                              const void *src,
-                              size_t size) {
+void cmCopyWithDestinationKey(void *dest, unsigned destKey, unsigned destALET,
+                              const void *src, size_t size) {
 
   copyWithDestinationKey(dest, destKey, destALET, src, size);
 
 }
 
-void cmCopyWithSourceKey(void *dest,
-                         const void *src,
-                         unsigned int srcKey,
-                         unsigned int srcALET,
-                         size_t size) {
+void cmCopyWithSourceKey(void *dest, const void *src, unsigned srcKey,
+                         unsigned srcALET, size_t size) {
 
   copyWithSourceKey(dest, src, srcKey, srcALET, size);
 
