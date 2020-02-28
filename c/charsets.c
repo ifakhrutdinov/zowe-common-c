@@ -32,6 +32,7 @@
 #include "alloc.h"
 #include "utils.h"
 #include "charsets.h"
+#include "xlate.h"
 
 #ifdef __ZOWE_OS_WINDOWS
 
@@ -128,6 +129,15 @@ int convertCharset(char *input,
                    ShortLivedHeap *slh, // optional
                    int *conversionOutputLength, 
                    int *reasonCode){
+
+#ifdef CHARSETS_E2A
+  if (inputCCSID == CCSID_IBM1047) {
+    memcpy(*output, input, inputLength);
+    e2a(*output, inputLength);
+    return CHARSET_CONVERSION_SUCCESS;
+  }
+#endif
+
   unsigned char dda [CUNBCPRM_DDA_REQ];
   unsigned char workBuffer [4096];
 #ifdef _LP64
