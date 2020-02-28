@@ -1441,9 +1441,9 @@ InetAddr *getAddressByName(char *addressString){
 
   if (!isV4Numeric(addressString,&numericAddress)){
     numericAddress = getV4HostByName(addressString);
-    printf("Host name is DNS or non-numeric, %x\n",numericAddress);
+//    printf("Host name is DNS or non-numeric, %x\n",numericAddress);
   } else{
-    printf("Host name is numeric %x\n",numericAddress);
+//    printf("Host name is numeric %x\n",numericAddress);
   }
   
   if (numericAddress != 0x7F123456){
