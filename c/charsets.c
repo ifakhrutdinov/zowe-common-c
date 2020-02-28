@@ -134,6 +134,7 @@ int convertCharset(char *input,
   if (inputCCSID == CCSID_IBM1047) {
     memcpy(*output, input, inputLength);
     e2a(*output, inputLength);
+    *conversionOutputLength = inputLength;
     return CHARSET_CONVERSION_SUCCESS;
   }
 #endif
