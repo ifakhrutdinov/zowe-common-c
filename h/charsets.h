@@ -73,6 +73,7 @@
 #define CHARSET_CONVERSION_ROUTINE_FAILURE 16  /**< a conversion status code */
 #define CHARSET_CONVERSION_UNIMPLEMENTED   20  /**< a conversion status code */
 #define CHARSET_UNKNOWN_CCSID              24  /**< a conversion status code */
+#define CHARSET_ALLOC_FAILED               28  /**< a conversion status code */
 
 /**
  *   convertCharset provides charset conversion with a set of constants defining input and output charsets
@@ -81,7 +82,7 @@
  *   output that is 2-3 times longer than the input.  
  */
 
-int convertCharset(char *input, 
+int convertCharset(const char *input,
                    int inputLength, 
                    int inputCCSID,
                    int outputMode,
