@@ -156,6 +156,8 @@ void stcBaseTerm(STCBase *stcBase);
   }
 #endif
 
+#define stcRegisterModule STCBREGM
+#define stcRegisterSocketExtension STCBREGX
 
 STCModule* stcRegisterModule(STCBase *stcBase,
                              int moduleID,
@@ -173,6 +175,12 @@ int stcReleaseSocketExtension(STCBase *stcBase,
                               SocketExtension *socketExtension);
 
 #ifdef __ZOWE_OS_ZOS
+
+#define stcLaunchConsoleTask stclct1
+#define stcLaunchConsoleTask2 stclct2
+#define stcBaseSelect stcbsel
+#define stcBaseShutdown stcbsht
+
 /* the userdata should provide the command receiver a way to address the base,
  * as well as any other context that will be needed to act on modify commands */
 int stcLaunchConsoleTask(STCBase *base,

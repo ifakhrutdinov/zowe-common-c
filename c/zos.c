@@ -41,6 +41,10 @@
 #include "utils.h"
 #include "zos.h"
 
+static void wtoPrintf(char *formatString, ...) {
+
+}
+
 #ifdef METTLE
 #define fprintf(out,fmt,...) printf(fmt,__VA_ARGS__)
 #define printf wtoPrintf

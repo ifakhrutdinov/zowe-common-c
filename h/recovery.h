@@ -351,6 +351,8 @@ typedef struct RecoveryContext_tag {
 #define recoveryUpdateStateServiceInfo RCVRUSSI
 #define recoveryGetABENDCode RCVRGACD
 #define runFunctioninESTAE RCVRNFNE
+#define recoveryMakeStatePool RCVRMSPL
+#define recoveryRemoveStatePool RCVRSPL
 #endif
 
 #ifdef __ZOWE_OS_ZOS

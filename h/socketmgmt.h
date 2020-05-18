@@ -48,6 +48,8 @@ typedef struct SocketExtension_tag{
   int   peerCertificateLength;
 } SocketExtension;
 
+#define makeSocketExtension MAKSEXT
+
 SocketExtension *makeSocketExtension(Socket *socket,
                                      ShortLivedHeap *slh,
                                      int allocateInSLH,

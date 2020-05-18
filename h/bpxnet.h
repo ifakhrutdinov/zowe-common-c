@@ -19,6 +19,16 @@
 #include "rs_ssl.h"
 #endif
 
+#define freeSocketSet FREESSET
+#define freeSocketAddr FREESADR
+#define tcpServer TCPSERV
+#define tcpServer2 TCPSERV2
+#define getLocalHostName GLHNAM
+#define getLocalHostAddress GLHADDR
+#define socketSetAdd SOCKSADD
+#define socketSetRemove SOCKSREM
+#define socketSend SOCKSEND
+
 #ifdef __ZOWE_OS_ZOS
 
 ZOWE_PRAGMA_PACK
@@ -242,6 +252,9 @@ InetAddr* getLocalHostAddress(int *returnCode, int *reasonCode); /* AKA gethosti
 /* zero-terminated */
 InetAddr *getAddressByName(char *addressString);
 
+#define getSocketName GETSNAM
+#define getSocketName2 GETSNAM2
+
 int getSocketName(Socket *socket, SocketAddress *socketAddress); /* AKA getsockname */
 int getSocketName2(Socket *socket, SocketAddress *socketAddress); /* AKA getpeername */
 Socket *tcpClient(SocketAddress *socketAddress,
@@ -304,6 +317,8 @@ int udpSendTo(Socket *socket,
               SocketAddress *destinationAddress,
               char *buffer, int desiredBytes, 
               int *returnCode, int *reasonCode);
+
+#define makeSocketSet MAKESSET
 
 SocketSet *makeSocketSet(int highestAllowedSD);
 void freeSocketSet(SocketSet *set);
@@ -369,8 +384,10 @@ int socketWrite(Socket *socket, const char *buffer, int desiredBytes,
 #define setSocketNoDelay setsktnd
 #define setSocketWriteBufferSize setsktwb
 #define setSocketReadBufferSize setsktrb
+#define setSocketBlockingMode setsktbm
 
 #endif
+
 
 int setSocketTimeout(Socket *socket, int timeout,
 		     int *returnCode, int *reasonCode);
@@ -408,6 +425,9 @@ int extendedSelect(SocketSet *set,
 char* e2a(char *buffer, int len);
 char* a2e(char *buffer, int len);
 */
+
+#define makeSocketAddr MAKSADDR
+#define makeSocketAddrIPv6 MAKSADR6
 
 SocketAddress *makeSocketAddr(InetAddr *addr, 
 			      unsigned short port);
